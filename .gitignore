@@ -1,0 +1,4 @@
+/__pycache__
+.idea
+/tests
+/instance/ipmi.db

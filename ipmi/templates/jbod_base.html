@@ -1,0 +1,22 @@
+{% import 'admin/layout.html' as layout with context -%}
+{% extends 'admin/base.html' %}
+
+{% block head_tail %}
+  {{ super() }}
+  <link href="{{ url_for('static', filename='css/custom.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block access_control %}
+  <span class="navbar-text">Host <i id="host-status-icon" class="fa fa-exclamation-circle"></i></span>
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/jbod.js') }}"></script>
+<script>
+{% set truenas_conn = truenas_connection_info() %}
+{% if truenas_conn %}
+  setupConnection( '{{ truenas_conn["ip"] }}', '{{ truenas_conn["api_key"] }}' );
+{% endif %}
+</script>
+{% endblock %}

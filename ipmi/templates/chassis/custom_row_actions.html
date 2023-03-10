@@ -1,0 +1,14 @@
+{% import 'admin/lib.html' as lib with context %}
+
+
+{% macro psu_toggle(action, row_id, row) %}
+{% if get_value(row, 'psu_on') %}
+<a class="icon" onclick="return faHelpers.safeConfirm('{{ _gettext('Are you sure you want turn off power to chassis?') }}');" title="{{ _gettext('Turn-Off PSU') }}" href="{{ get_url('chassis.psu_toggle', id=row_id, state='OFF') }}">
+  <span class="mdl-power-off"></span>
+</a>
+{% else %}
+<a class="icon" onclick="return faHelpers.safeConfirm('{{ _gettext('Are you sure you want turn on power to chassis?') }}');" title="{{ _gettext('Turn-On PSU') }}" href="{{ get_url('chassis.psu_toggle', id=row_id, state='ON') }}">
+  <span class="mdl-power-on"></span>
+</a>
+{% endif %}
+{% endmacro %}

@@ -1,0 +1,19 @@
+{% extends 'admin/model/create.html' %}
+
+{% block head %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/addons/chart.umd.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/addons/chartjs-plugin-dragdata.min.js') }}"></script>
+{% endblock %}
+
+{% block body %}
+    <!-- canvas element in a container -->
+    <div class="wrapper">
+      <canvas id="canvas" width="1000" height="300"></canvas>
+    </div>
+{% endblock %}
+
+{% block tail_js %}
+<script src="{{ url_for('static', filename='js/setpoints/create.js') }}"></script>
+{{ super() }}
+{% endblock %}

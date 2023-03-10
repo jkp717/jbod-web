@@ -1,0 +1,13 @@
+.mdl-fan {
+  display: inline-block;
+  width: 16px;
+  height: 14px;
+  background-image: url(/static/icons/fan.svg);
+  background-position-x: left;
+  background-position-y: bottom;
+  background-repeat: no-repeat;
+}
+
+.host-status {
+  width: 30px;
+}
