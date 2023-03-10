@@ -260,8 +260,8 @@ class ControllerView(JBODBaseView):
             flash('No response from controller. Check connection settings and try again.', 'error')
             return redirect(self.get_url('.index_view'))
         for i in range(ack_cnt):
-            existing = db.session.query(Controller).where(Controller.id == i).first()
-            c_model = existing if existing else Controller(id=i)
+            existing = db.session.query(Controller).where(Controller.id == i+1).first()
+            c_model = existing if existing else Controller(id=i+1)
             try:
                 c_model = query_controller_properties(c_model)
             except JBODConsoleAckException as err:

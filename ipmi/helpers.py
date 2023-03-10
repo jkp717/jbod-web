@@ -37,7 +37,7 @@ def datetime_formatter(view, value, name):
     return value.strftime('%d/%m/%Y %H:%M')
 
 
-def byte_formatter(view, value):
+def byte_formatter(view, value, name):
     return Markup("""&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;""")
 
 

@@ -124,7 +124,7 @@ class JBODConsole(Serial):
         _rx = self._jbod_rx()
         # prevent IndexError by returning an empty tuple
         if _rx is None or _rx == b'\x00':
-            return None, None
+            return (None, None)  # NOQA
         # convert bytes to ascii string; remove null terminator; filter null items
         return tuple(filter(None, _rx.decode('ASCII').split('\x00')))
 

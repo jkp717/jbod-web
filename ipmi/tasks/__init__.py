@@ -36,6 +36,8 @@ def truenas_connection_info():
             }
         except TypeError:
             return None
+        except AttributeError:
+            return None
 
 
 def _truenas_api_request(method: str, url_path: str, headers: dict = None, data: dict = None):
@@ -258,7 +260,7 @@ def query_controller_properties(controller: Controller) -> Controller:
                 command_req=com.cmd.DEVICE_ID, command_args=[controller.id]
             )
         # assign model attrs based on mapper
-        for id_type in dev_id[1].strip("{}").split(","):
+        for id_type in dev_id[1].strip().strip("{}").split(","):
             setattr(controller, dev_id_mapper.get(id_type.split(':')[0]), id_type.split(':')[1])
 
         # get total fan ports supported by controller
