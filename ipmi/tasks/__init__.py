@@ -122,7 +122,7 @@ def poll_setpoints() -> None:
             if not disks:
                 _logger.warning("No disks assigned to chassis %s, %s", jbod.name, jbod.id)
                 continue
-            fans = db.session.query(Disk).where(Fan.chassis_id == jbod.id).all()
+            fans = db.session.query(Fan).where(Fan.chassis_id == jbod.id).all()
             temp_agg = max([int(d.last_temp_reading) for d in disks if str(d.last_temp_reading).isnumeric()])
             # get all setpoint models for each fan
             for fan in fans:
@@ -180,10 +180,12 @@ def poll_fan_rpm() -> None:
     """
     with scheduler.app.app_context():
         com = None
-        jbods = db.session.query(Chassis).all()
+        jbods = db.session.query(Chassis).where(Chassis.controller_id != None).all()  # noqa
         for jbod in jbods:
             # send each fan to controller to get rpm values
-            fans = db.session.query(Disk).where(Fan.chassis_id == jbod.id).all()
+            fans = db.session.query(Fan).where(Fan.chassis_id == jbod.id).all()
+            if not fans:
+                return None
             for fan in fans:
                 # Keep current rpm for reference later
                 _old_rpm = fan.rpm

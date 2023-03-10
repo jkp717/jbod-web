@@ -54,7 +54,7 @@ def create_app(test_config=None):
     db.init_app(app)
     admin.init_app(app)
     scheduler.init_app(app)
-    # scheduler.start()
+    scheduler.start()
 
     # Create the database if it doesn't already exist
     if not os.path.exists(app.config['SQLALCHEMY_DATABASE_URI']):
