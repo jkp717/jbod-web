@@ -50,7 +50,7 @@ def _truenas_api_request(method: str, url_path: str, headers: dict = None, data:
         base_url = db.session.execute(
             db.select(SysConfig).where(SysConfig.key == "truenas_url")
         ).first()
-        if getattr(api_key[0], 'value', None) or getattr(base_url[0], 'value', None):
+        if getattr(api_key[0], 'value', None) and getattr(base_url[0], 'value', None):
             if getattr(api_key[0], 'encrypt'):
                 _api_key = current_app.decrypt(getattr(api_key[0], 'value')).decode()
             else:
@@ -69,22 +69,23 @@ def _truenas_api_request(method: str, url_path: str, headers: dict = None, data:
 def query_disk_properties() -> None:
     with scheduler.app.app_context():
         resp = _truenas_api_request('GET', '/api/v2.0/disk')
-        for disk in resp.json():
-            db.session.merge(
-                Disk(
-                    name=disk.get('name', None),
-                    devname=disk.get('devname', None),
-                    model=disk.get('model', None),
-                    serial=disk.get('serial', None),
-                    subsystem=disk.get('subsystem', None),
-                    size=disk.get('size', None),
-                    rotationrate=disk.get('rotationrate', None),
-                    type=disk.get('type', None),
-                    bus=disk.get('bus', None),
+        if resp:
+            for disk in resp.json():
+                db.session.merge(
+                    Disk(
+                        name=disk.get('name', None),
+                        devname=disk.get('devname', None),
+                        model=disk.get('model', None),
+                        serial=disk.get('serial', None),
+                        subsystem=disk.get('subsystem', None),
+                        size=disk.get('size', None),
+                        rotationrate=disk.get('rotationrate', None),
+                        type=disk.get('type', None),
+                        bus=disk.get('bus', None),
+                    )
                 )
-            )
-        db.session.commit()
-        _logger.info("query_disk_properties scheduled job complete")
+            db.session.commit()
+            _logger.info("query_disk_properties scheduled job complete")
 
 
 @scheduler.task('interval', id='query_disk_temperatures', seconds=30)
@@ -97,15 +98,16 @@ def query_disk_temperatures() -> None:
             headers={'Content-Type': 'application/json'},
             data={"names": [disk[0].name for disk in disks], "powermode": "NEVER"}
         )
-        if resp.status_code == 200:
-            for _name, temp in resp.json().items():
-                db.session.add(
-                    DiskTemp(**{'disk_id': d[0].serial for d in disks if d[0].name == _name}, temp=temp)
-                )
-            db.session.commit()
-            _logger.info("query_disk_temperatures scheduled job complete")
-        else:
-            _logger.error(f"query_disk_temperatures api response code: {resp.status_code}")
+        if resp:
+            if resp.status_code == 200:
+                for _name, temp in resp.json().items():
+                    db.session.add(
+                        DiskTemp(**{'disk_id': d[0].serial for d in disks if d[0].name == _name}, temp=temp)
+                    )
+                db.session.commit()
+                _logger.info("query_disk_temperatures scheduled job complete")
+            else:
+                _logger.error(f"query_disk_temperatures api response code: {resp.status_code}")
 
 
 @scheduler.task('interval', id='poll_setpoints', seconds=60)
@@ -213,7 +215,9 @@ def poll_fan_rpm() -> None:
 def query_host_state() -> str:
     # states = ['BOOTING', 'READY', 'SHUTTING_DOWN']
     resp = _truenas_api_request('GET', '/api/v2.0/system/state')
-    return resp.text
+    if resp:
+        return resp.text
+    return 'UNKNOWN'
 
 
 def ping_controllers() -> int:
