@@ -1,0 +1,28 @@
+{% import 'admin/lib.html' as lib with context %}
+
+{% macro fan_calibration(action, row_id, row) %}
+{% set requestUrl = get_url('fan.calibrate', id=row_id) %}
+<a class="icon" title="{{ _gettext('Calibrate Fan') }}" href="#" onclick="fanCalibrationHandler('{{ requestUrl }}', '{{ row_id }}');">
+  <span class="fa fa-dashboard"></span>
+</a>
+<div class="modal calibration-progress-modal" tabindex="-1" role="dialog" data-fan="{{ row_id }}">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Calibrating...</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="progress">
+          <div class="progress-bar" role="progressbar" style="width: 0%;"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endmacro %}

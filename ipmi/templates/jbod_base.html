@@ -7,7 +7,33 @@
 {% endblock %}
 
 {% block access_control %}
-  <span class="navbar-text">Host <i id="host-status-icon" class="fa fa-exclamation-circle"></i></span>
+{% with serial = get_serial_connection() %}
+<span id="connStatusPopover" class="navbar-popover{{ ' navbar-popover-alert' if not serial else '' }}">
+    <a tabindex="0"  type="button" data-container="body" data-toggle="popover" data-trigger="focus" data-placement="bottom">
+      <i id="connStatusPopoverIcon" class="fa fa-chain"></i>
+        <span class="navbar-popover-badge"></span>
+    </a>
+    <div class="popover-container">
+        <div class="popover-content">
+            <div id="hostConnStatus" class="popover-content-attr disconnected">Host <i class="fa fa-solid fa-minus-circle"></i></div>
+            <div id="controllerConnStatus" class="popover-content-attr{{ ' disconnected' if not serial else ''}}">Controller <i class="fa fa-solid {{ 'fa-check-circle' if serial else 'fa-minus-circle' }}"></i></div>
+        </div>
+    </div>
+</span>
+{% endwith %}
+<span id="alertPopover" class="navbar-popover" data-flag="false">
+    <a tabindex="0"  type="button" data-container="body" data-toggle="popover" data-trigger="focus" data-placement="bottom">
+        <i id="alertPopoverIcon" class="fa fa-bell"></i>
+        <span class="navbar-popover-badge"></span>
+    </a>
+    <div class="popover-container">
+        <span>No alerts...</span>
+    </div>
+</span>
+{% endblock %}
+
+{% block brand %}
+    <a class="navbar-brand" href="{{ admin_view.admin.url }}"><img src="{{ url_for('static', filename='icons/remote-desktop-white.png') }}" alt="{{ admin_view.admin.name }}" /></a>
 {% endblock %}
 
 {% block tail_js %}
@@ -18,5 +44,15 @@
 {% if truenas_conn %}
   setupConnection( '{{ truenas_conn["ip"] }}', '{{ truenas_conn["api_key"] }}' );
 {% endif %}
+$(function () {
+  $('#connStatusPopover > a').popover({
+    content: document.querySelector('#connStatusPopover > .popover-container').innerHTML,
+    html: true
+  });
+  $('#alertPopover > a').popover({
+    content: document.querySelector('#alertPopover > .popover-container').innerHTML,
+    html: true
+  });
+});
 </script>
 {% endblock %}

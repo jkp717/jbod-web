@@ -1,3 +1,29 @@
+:root {
+  --color-gradient-10: 250, calc(25*1), calc(25*1), 50;
+  --color-gradient-9: 250, calc(25*2), calc(25*2), 50;
+  --color-gradient-8: 250, calc(25*3), calc(25*3), 50;
+  --color-gradient-7: 250, calc(25*4), calc(25*4), 50;
+  --color-gradient-6: 250, calc(25*5), calc(25*5), 50;
+  --color-gradient-5: 250, calc(25*6), calc(25*6), 50;
+  --color-gradient-4: 250, calc(25*7), calc(25*7), 50;
+  --color-gradient-3: 250, calc(25*8), calc(25*8), 50;
+  --color-gradient-2: 250, calc(25*9), calc(25*9), 50;
+  --color-gradient-1: 250, calc(25*10), calc(25*10), 50;
+  --mdl-harddisk-svg: 'data:image/svg+xml,%3Csvg xmlns="http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg" width="24" height="24" viewBox="0 0 24 24"%3E%3Cpath fill="currentColor" d="M6 2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2m6 2a6 6 0 0 0-6 6c0 3.31 2.69 6 6.1 6l-.88-2.23a1.01 1.01 0 0 1 .37-1.37l.86-.5a1.01 1.01 0 0 1 1.37.37l1.92 2.42A5.977 5.977 0 0 0 18 10a6 6 0 0 0-6-6m0 5a1 1 0 0 1 1 1a1 1 0 0 1-1 1a1 1 0 0 1-1-1a1 1 0 0 1 1-1m-5 9a1 1 0 0 0-1 1a1 1 0 0 0 1 1a1 1 0 0 0 1-1a1 1 0 0 0-1-1m5.09-4.73l2.49 6.31l2.59-1.5l-4.22-5.31l-.86.5Z"%2F%3E%3C%2Fsvg%3E';
+}
+
+.red-color-gradient-1 { background: radial-gradient(circle, rgba(255,255,255,0) 0%, rgba(var(--color-gradient-1)) 50%); }
+.red-color-gradient-2 { background: radial-gradient(circle, rgba(255,255,255,0) 0%, rgba(var(--color-gradient-2)) 50%); }
+.red-color-gradient-3 { background: radial-gradient(circle, rgba(255,255,255,0) 0%, rgba(var(--color-gradient-3)) 50%); }
+.red-color-gradient-4 { background: radial-gradient(circle, rgba(255,255,255,0) 0%, rgba(var(--color-gradient-4)) 50%); }
+.red-color-gradient-5 { background: radial-gradient(circle, rgba(255,255,255,0) 0%, rgba(var(--color-gradient-5)) 50%); }
+.red-color-gradient-6 { background: radial-gradient(circle, rgba(255,255,255,0) 0%, rgba(var(--color-gradient-6)) 50%); }
+.red-color-gradient-7 { background: radial-gradient(circle, rgba(255,255,255,0) 0%, rgba(var(--color-gradient-7)) 50%); }
+.red-color-gradient-8 { background: radial-gradient(circle, rgba(255,255,255,0) 0%, rgba(var(--color-gradient-8)) 50%); }
+.red-color-gradient-9 { background: radial-gradient(circle, rgba(255,255,255,0) 0%, rgba(var(--color-gradient-9)) 50%); }
+.red-color-gradient-10 { background: radial-gradient(circle, rgba(255,255,255,0) 0%, rgba(var(--color-gradient-10)) 50%); }
+
+
 .mdl-fan {
   display: inline-block;
   width: 16px;
@@ -10,4 +36,168 @@
 
 .host-status {
   width: 30px;
+}
+
+.fa.fa-check-circle {
+  color: lightgreen;
+}
+
+.fa.fa-question-circle {
+  color: indianred;
+}
+
+.right-justify {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-end;
+}
+
+.split-between {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.card-list-item {
+    padding-left: 10px;
+    padding-right: 30px;
+}
+
+.card-list {
+    list-style-type: none;
+    padding-left: 5px;
+    font-size: .75rem;
+}
+
+.card-list-text {
+    color: #6c757d!important;
+}
+
+.no-left-padding {
+    padding-left: 0px;
+}
+
+.navbar-popover {
+    display: inline-block;
+    margin: 0px 5px;
+}
+
+.navbar-popover-alert > a > .navbar-popover-badge {
+    display: inline-block;
+}
+
+.navbar-popover > a {
+    padding: 0px;
+    margin: 0px;
+    border: unset;
+    display: flex;
+    position: relative;
+    background-color: transparent;
+}
+
+.navbar-popover > a:hover {
+    color: unset;
+    text-decoration: unset;
+}
+
+.navbar-popover > a > i {
+    color: #343a40!important;
+    background-color: rgba(255,255,255,.5);
+    border-radius: 100%;
+    padding: 5px;
+}
+
+.popover-container {
+    display: none;
+}
+
+.navbar-popover-badge {
+    display: none;
+    background-color: red;
+    width: 8px;
+    height: 8px;
+    border-radius: 100%;
+    position: absolute;
+    right: -3px;
+    top: -1px;
+}
+
+.card-shelf {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.card-icon {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
+    /*margin: 5px;*/
+    cursor: pointer;
+    position: relative;
+    transition: all .2s ease-in-out;
+}
+
+.card-icon:hover {
+    transform: scale(1.1);
+}
+
+.mdl-harddisk {
+    aspect-ratio: 1 / 1;
+    fill: #343a40 !important;
+    width: 60px;
+    z-index: 1;
+}
+
+.mdl-harddisk-grey{
+    aspect-ratio: 1 / 1;
+    fill: #a7a7a7 !important;
+    width: 60px;
+}
+
+.chassis-card-title {
+    margin-left: 10px;
+    margin-top: 20px;
+}
+
+.chassis-card {
+    /*max-width: 815px;*/
+    max-width: max-content;
+}
+
+.chassis-card > .card-body {
+    padding: 0.5rem;
+}
+
+.chassis-card-title > h5 {
+    opacity: 0.5;
+    color: rgb(0, 0, 0);
+    text-transform: uppercase;
+    font-size: 1rem;
+}
+
+.disk-tooltip-item {
+    display: block;
+    max-width: 300px;
+    min-width: 100px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.disk-tooltip-temp {
+    display: block;
+    max-width: 300px;
+    min-width: 100px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 20px;
+    font-weight: 500;
+}
+
+.card-text .support-text {
+    font-size: 13px;
+    opacity: 0.5;
+    color: rgb(0, 0, 0);
+    display: inline-block;
 }

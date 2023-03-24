@@ -1,17 +1,30 @@
 import datetime
-from ipmi import db
-import sqlalchemy as sa
+from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.ext.hybrid import hybrid_property
+
+
+db = SQLAlchemy()
+
+
+class Celsius(int):
+    def __new__(cls, value, *args, **kwargs):
+        return super(cls, cls).__new__(cls, value)
+
+    def __str__(self):
+        return "%d\N{DEGREE SIGN}" % int(self)
+
+    def __repr__(self):
+        return "%d\N{DEGREE SIGN}" % int(self)
 
 
 class SysConfig(db.Model):
     __tablename__ = "sys_config"
-    id = sa.Column(sa.Integer, primary_key=True)
-    key = sa.Column(sa.String, unique=True)
-    value = sa.Column(sa.String)
-    encrypt = sa.Column(sa.Boolean, default=False)
-    create_date = sa.Column(sa.DateTime, default=datetime.datetime.utcnow)
-    modify_date = sa.Column(sa.DateTime, onupdate=datetime.datetime.utcnow)
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String, unique=True)
+    value = db.Column(db.String)
+    encrypt = db.Column(db.Boolean, default=False)
+    create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
 
     @hybrid_property
     def last_update(self):
@@ -20,23 +33,64 @@ class SysConfig(db.Model):
         return self.create_date
 
 
+class SysJob(db.Model):
+    __tablename__ = "sys_job"
+    id = db.Column(db.Integer, primary_key=True)
+    job_id = db.Column(db.String, unique=True)
+    func = db.Column(db.String)
+    args = db.Column(db.String)
+    trigger = db.Column(db.String, default='interval')
+    seconds = db.Column(db.Integer, default=0)
+    minutes = db.Column(db.Integer, default=0)
+    hours = db.Column(db.Integer, default=0)
+    job_name = db.Column(db.String)
+    description = db.Column(db.String)
+    active = db.Column(db.Boolean, default=False)
+    create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
+
+    @hybrid_property
+    def last_update(self):
+        if self.modify_date:
+            return self.modify_date
+        return self.create_date
+
+    @hybrid_property
+    def job_dict(self):
+        return {
+            "id": self.job_id,
+            "func": self.func,
+            "args": self.args,
+            "trigger": self.trigger,
+            "seconds": self.seconds,
+            "minutes": self.minutes,
+            "hours": self.hours
+        }
+
+
 class Disk(db.Model):
     __tablename__ = "disk"
-    # id = sa.Column(sa.Integer, primary_key=True)
+    # id = db.Column(db.Integer, primary_key=True)
     # Retrieved from TrueNAS Disk API
-    serial = sa.Column(sa.String, primary_key=True)
-    name = sa.Column(sa.String, unique=True, nullable=False)
-    devname = sa.Column(sa.String, unique=True)
-    model = sa.Column(sa.String)
-    subsystem = sa.Column(sa.String)  #
-    size = sa.Column(sa.Integer)  # in bytes
-    rotationrate = sa.Column(sa.Integer)  # rpm
-    type = sa.Column(sa.String)  # HDD, SDD, etc...
-    bus = sa.Column(sa.String)  # SCSI, SATA, etc...
+    serial = db.Column(db.String, primary_key=True)
+    name = db.Column(db.String, unique=True, nullable=False)
+    devname = db.Column(db.String, unique=True)
+    model = db.Column(db.String)
+    subsystem = db.Column(db.String)  #
+    size = db.Column(db.Integer)  # in bytes
+    rotationrate = db.Column(db.Integer)  # rpm
+    type = db.Column(db.String)  # HDD, SDD, etc...
+    bus = db.Column(db.String)  # SCSI, SATA, etc...
+    zfs_pool = db.Column(db.String)  # zfs pool name
+    zfs_topology = db.Column(db.String)  # [data,log,cache,spare,special,dedup]
+    zfs_device_path = db.Column(db.String)
+    read_errors = db.Column(db.Integer, default=0)
+    write_errors = db.Column(db.Integer, default=0)
+    checksum_errors = db.Column(db.Integer, default=0)
     # End of columns retrieved from TrueNAS
-    phy_slot_id = sa.Column(sa.Integer, sa.ForeignKey("phy_slot.id"))
-    create_date = sa.Column(sa.DateTime, default=datetime.datetime.utcnow)
-    modify_date = sa.Column(sa.DateTime, onupdate=datetime.datetime.utcnow)
+    phy_slot_id = db.Column(db.Integer, db.ForeignKey("phy_slot.id"))
+    create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
     disk_temps = db.relationship('DiskTemp', back_populates='disk')
     phy_slot = db.relationship('PhySlot', back_populates='disk', uselist=False)
 
@@ -48,13 +102,31 @@ class Disk(db.Model):
 
     @hybrid_property
     def last_temp_reading(self):
-        return max([temp.create_date is not None for temp in self.disk_temps])
+        if self.disk_temps:
+            return max([temp.create_date for temp in self.disk_temps])
+        return None
 
     @last_temp_reading.expression
     def last_temp_reading(cls):
-        return db.select(db.func.max(DiskTemp.create_date)).\
-                where(DiskTemp.disk_id == cls.id).\
-                label('last_temp_reading')
+        return (db.select(db.func.max(DiskTemp.create_date)).
+                where(DiskTemp.disk_serial == cls.serial).
+                label('last_temp_reading'))
+
+    @hybrid_property
+    def temperature(self):
+        if self.disk_temps:
+            curr = [t.temp for t in self.disk_temps if self.last_temp_reading == t.create_date]
+            try:
+                return Celsius(curr[0])
+            except IndexError:
+                pass
+        return Celsius(0)
+
+    @temperature.expression
+    def temperature(cls):
+        return (db.select(DiskTemp.temp).
+                filter(DiskTemp.disk_serial == cls.serial, DiskTemp.create_date == cls.last_temp_reading).
+                label('temperature'))
 
     @hybrid_property
     def last_update(self):
@@ -63,18 +135,41 @@ class Disk(db.Model):
         return self.create_date
 
 
+class DiskTemp(db.Model):
+    __tablename__ = "disk_temp"
+    id = db.Column(db.Integer, primary_key=True)
+    temp = db.Column(db.Integer, nullable=False)
+    disk_serial = db.Column(db.String, db.ForeignKey("disk.serial"))
+    disk = db.relationship('Disk', back_populates='disk_temps')
+    create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+    def __repr__(self):
+        return f"{self.temp}"
+
+
 class Chassis(db.Model):
     __tablename__ = "chassis"
-    id = sa.Column(sa.Integer, primary_key=True)
-    name = sa.Column(sa.String, unique=True)
-    slot_cnt = sa.Column(sa.Integer, nullable=False)
-    psu_on = sa.Column(sa.Boolean, default=False)
-    controller_id = sa.Column(sa.Integer, sa.ForeignKey("controller.id"))
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String, unique=True)
+    slot_cnt = db.Column(db.Integer, nullable=False)
+    psu_on = db.Column(db.Boolean, default=False)
+    controller_id = db.Column(db.Integer, db.ForeignKey("controller.id"))
     phy_slots = db.relationship('PhySlot', back_populates='chassis', cascade="all, delete-orphan")
-    fans = db.relationship('Fan', back_populates='chassis', cascade="all, delete-orphan")
     controller = db.relationship('Controller', back_populates='chassis', uselist=False)
-    create_date = sa.Column(sa.DateTime, default=datetime.datetime.utcnow)
-    modify_date = sa.Column(sa.DateTime, onupdate=datetime.datetime.utcnow)
+    create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
+
+    @hybrid_property
+    def fans(self):
+        if self.controller:
+            return getattr(self.controller, 'fans')
+        return []
+
+    @hybrid_property
+    def disks(self):
+        if self.phy_slots:
+            return [slot.disk for slot in self.phy_slots if slot.disk is not None]
+        return []
 
     @hybrid_property
     def fan_port_cnt(self):
@@ -94,13 +189,28 @@ class Chassis(db.Model):
 
     @hybrid_property
     def active_fans(self):
-        return sum([fan.active for fan in self.fans if fan.chassis_id == self.id])
+        if self.fans:
+            return sum([fan.active for fan in self.fans])
 
     @active_fans.expression
     def active_fans(cls):
         return db.select(db.func.count(Fan.id)).\
-                where(PhySlot.chassis_id == cls.id).\
+                where(Fan.controller_id == cls.controller_id, Fan.active == True). \
                 label('active_fans')
+
+    @hybrid_property
+    def avg_disk_temp(self):
+        if self.phy_slots:
+            disks = [slot.disk for slot in self.phy_slots if slot.disk is not None]
+            if disks:
+                return sum([disk.temperature for disk in disks]) / len(disks)
+        return 0
+
+    @avg_disk_temp.expression
+    def avg_disk_temp(cls):
+        return db.select(db.func.avg(Disk.temperature)).\
+                where(Disk.chassis_id == cls.id).\
+                label('avg_disk_temp')
 
     @hybrid_property
     def last_update(self):
@@ -116,13 +226,13 @@ class Chassis(db.Model):
 
 class PhySlot(db.Model):
     __tablename__ = "phy_slot"
-    id = sa.Column(sa.Integer, primary_key=True)
-    phy_slot = sa.Column(sa.Integer, nullable=False)
-    chassis_id = sa.Column(sa.Integer, sa.ForeignKey("chassis.id"))
+    id = db.Column(db.Integer, primary_key=True)
+    phy_slot = db.Column(db.Integer, nullable=False)
+    chassis_id = db.Column(db.Integer, db.ForeignKey("chassis.id"))
     chassis = db.relationship('Chassis', back_populates='phy_slots')
     disk = db.relationship('Disk', back_populates='phy_slot', uselist=False)
-    create_date = sa.Column(sa.DateTime, default=datetime.datetime.utcnow)
-    modify_date = sa.Column(sa.DateTime, onupdate=datetime.datetime.utcnow)
+    create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
 
     @hybrid_property
     def last_update(self):
@@ -136,13 +246,14 @@ class PhySlot(db.Model):
 
 class Controller(db.Model):
     __tablename__ = "controller"
-    id = sa.Column(sa.Integer, primary_key=True)
-    mcu_device_id = sa.Column(sa.String)
-    mcu_lot_id = sa.Column(sa.String)
-    mcu_wafer_id = sa.Column(sa.String)
-    mcu_revision_id = sa.Column(sa.String)
-    firmware_version = sa.Column(sa.String)
-    fan_port_cnt = sa.Column(sa.Integer, nullable=False)
+    id = db.Column(db.Integer, primary_key=True)
+    mcu_device_id = db.Column(db.String)
+    mcu_lot_id = db.Column(db.String)
+    mcu_wafer_id = db.Column(db.String)
+    mcu_revision_id = db.Column(db.String)
+    firmware_version = db.Column(db.String)
+    fan_port_cnt = db.Column(db.Integer)
+    fans = db.relationship('Fan', back_populates='controller', cascade="all, delete-orphan")
     chassis = db.relationship('Chassis', back_populates='controller', uselist=False)
     __table_args__ = (
         db.UniqueConstraint(
@@ -159,41 +270,32 @@ class Controller(db.Model):
             return self.modify_date
         return self.create_date
 
+    @hybrid_property
+    def uuid(self):
+        return f"{self.mcu_device_id}-{self.mcu_lot_id}-{self.mcu_wafer_id}-{self.mcu_revision_id}"
+
     def __repr__(self):
         return f"Controller(id={self.id}, " \
                f"mcu={self.mcu_device_id}-{self.mcu_lot_id}-{self.mcu_wafer_id}-{self.mcu_revision_id})"
 
 
-class DiskTemp(db.Model):
-    __tablename__ = "disk_temp"
-    id = sa.Column(sa.Integer, primary_key=True)
-    temp = sa.Column(sa.Integer, nullable=False)
-    disk_id = sa.Column(sa.String, sa.ForeignKey("disk.serial"))
-    disk = db.relationship('Disk', back_populates='disk_temps')
-    create_date = sa.Column(sa.DateTime, default=datetime.datetime.utcnow)
-
-
 class Fan(db.Model):
     __tablename__ = "fan"
-    id = sa.Column(sa.Integer, primary_key=True)
-    chassis_id = sa.Column(sa.Integer, sa.ForeignKey("chassis.id"))
-    port_num = sa.Column(sa.Integer)
-    pwm = sa.Column(sa.Integer, default=100)
-    rpm = sa.Column(sa.Integer, default=0)
-    max_rpm = sa.Column(sa.Integer)
-    min_rpm = sa.Column(sa.Integer)
-    four_pin = sa.Column(sa.Boolean, default=False)
-    active = sa.Column(sa.Boolean, default=False)
-    chassis = db.relationship('Chassis', back_populates='fans')
+    id = db.Column(db.Integer, primary_key=True)
+    controller_id = db.Column(db.Integer, db.ForeignKey("controller.id"))
+    port_num = db.Column(db.Integer)
+    pwm = db.Column(db.Integer, default=100)
+    rpm = db.Column(db.Integer, default=0)
+    max_rpm = db.Column(db.Integer)
+    min_rpm = db.Column(db.Integer)
+    four_pin = db.Column(db.Boolean, default=False)
+    active = db.Column(db.Boolean, default=False)
+    calibration_job_uuid = db.Column(db.String)
+    calibration_status = db.Column(db.Integer)
+    controller = db.relationship('Controller', back_populates='fans', uselist=False)
     setpoints = db.relationship('FanSetpoint', back_populates='fan', cascade="all, delete-orphan")
-    create_date = sa.Column(sa.DateTime, default=datetime.datetime.utcnow)
-    modify_date = sa.Column(sa.DateTime, onupdate=datetime.datetime.utcnow)
-
-    @hybrid_property
-    def v(self):
-        if self.chassis:
-            return self.chassis.controller
-        return None
+    create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
 
     @hybrid_property
     def last_update(self):
@@ -202,23 +304,21 @@ class Fan(db.Model):
         return self.create_date
 
     def __repr__(self):
-        if self.chassis:
-            return f"{self.chassis} / Fan: {self.port_num}"
         return f"Fan ID: {self.id}"
 
 
 class FanSetpoint(db.Model):
     __tablename__ = "fan_setpoint"
-    id = sa.Column(sa.Integer, primary_key=True)
-    fan_id = sa.Column(sa.Integer, sa.ForeignKey("fan.id"))
-    pwm = sa.Column(sa.Integer)
-    temp = sa.Column(sa.Integer)
+    id = db.Column(db.Integer, primary_key=True)
+    fan_id = db.Column(db.Integer, db.ForeignKey("fan.id"))
+    pwm = db.Column(db.Integer)
+    temp = db.Column(db.Integer)
     fan = db.relationship('Fan', back_populates='setpoints')
-    create_date = sa.Column(sa.DateTime, default=datetime.datetime.utcnow)
-    modify_date = sa.Column(sa.DateTime, onupdate=datetime.datetime.utcnow)
+    create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
     __table_args__ = (
-        sa.UniqueConstraint('fan_id', 'pwm', name='fan_setpoint_pwm_uc'),
-        sa.UniqueConstraint('fan_id', 'temp', name='fan_setpoint_temp_uc')
+        db.UniqueConstraint('fan_id', 'pwm', name='fan_setpoint_pwm_uc'),
+        db.UniqueConstraint('fan_id', 'temp', name='fan_setpoint_temp_uc')
     )
 
     @hybrid_property

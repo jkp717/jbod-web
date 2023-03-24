@@ -1,0 +1,43 @@
+{% extends 'jbod_base.html' %}
+
+{% block head %}
+  {{ super() }}
+<script src="{{ url_for('static', filename='js/addons/chart.umd.min.js') }}"></script>
+{% endblock %}
+
+{% block body %}
+<div class="row">
+  {% block new_setup_card %}{% endblock %}
+  <div class="col">
+    {% for jbod in jbods %}
+    <div class="chassis-card-title">
+      <h5>{{ jbod.name }}</h5>
+    </div>
+    <div class="card chassis-card">
+      <div class="card-body">
+        <div class="card-shelf">
+          {% for slot in jbod.phy_slots %}
+          <div class="card-icon">
+            {% with disk = slot.disk %}
+            <i class="mdl-harddisk{{ '-grey' if disk is none else '' }}" data-toggle="popover" title="Slot-{{ slot.phy_slot }} {% if disk is not none %}({{ disk.name }}){% endif %}" data-content="{{ disk_tooltip_html(slot.disk) }}">
+            {{ svg_html_converter(url_for('static', filename='icons/harddisk.svg')) }}
+            </i>
+            {% endwith %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+
+{% block tail %}
+{{ super() }}
+<script>
+$(function() {
+ $('[data-toggle="popover"]').popover({html: true});
+});
+</script>
+{% endblock %}

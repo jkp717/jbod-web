@@ -15,7 +15,7 @@ function loadSetpointData(callback) {
             callback(JSON.parse(this.responseText));
         }
     }
-    xhttp.open("GET", "/admin/fan/setpoints?fan_id=" + fanId, true);
+    xhttp.open("GET", "/fan/setpoints?fan_id=" + fanId, true);
     xhttp.send();
 }
 
@@ -113,7 +113,7 @@ function newSetpointHandler() {
       alert('Oops! Something went wrong.');
     });
 
-    XHR.open("POST", "/admin/setpoints/new?fan_id=" + fanId);
+    XHR.open("POST", "/setpoints/new?fan_id=" + fanId);
     XHR.send(fd);
   });
 };
@@ -143,7 +143,7 @@ document.querySelector("form.admin-form").addEventListener("submit", (event) => 
     XHR.addEventListener("error", (event) => {
       alert('Oops! Something went wrong.');
     });
-    XHR.open("POST", "/admin/fan/setpoints?fan_id=" + fanId);
+    XHR.open("POST", "/fan/setpoints?fan_id=" + fanId);
     XHR.setRequestHeader("Content-Type", 'application/json');
     XHR.send(JSON.stringify(postArray));
 });
