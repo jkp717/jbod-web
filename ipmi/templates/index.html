@@ -1,0 +1,114 @@
+{% extends 'base_index.html' %}
+
+{% block new_setup_card %}
+<div class="col-sm-4">
+  <div class="card">
+    <div class="card-body">
+      <h5 class="card-title">Settings</h5>
+      <p class="card-text">
+        <b>{{ "" if setup_complete else "Setup Required!" }}</b> Click links below to complete. <i class="support-text">Settings can be updated at any time in the Settings tab.</i>
+      </p>
+      <div class="list-group">
+        <a href="#" class="list-group-item list-group-item-action" data-toggle="modal" data-target="#truenas-setup-modal">
+          {% if setup_required.truenas %}
+          <span class="fa fa-solid fa-check-circle" style="padding-right: 20px;"></span>
+          {% else %}
+          <span class="fa fa-question-circle" style="padding-right: 20px;"></span>
+          {% endif %}
+          Setup TrueNAS API connection
+        </a>
+        <a href="#" class="list-group-item list-group-item-action" data-toggle="modal" data-target="#controller-setup-modal">
+          {% if setup_required.controller %}
+          <span class="fa fa-solid fa-check-circle" style="padding-right: 20px;"></span>
+          {% else %}
+          <span class="fa fa-question-circle" style="padding-right: 20px;"></span>
+          {% endif %}
+          Configure controller serial connection
+        </a>
+        <a href="{{ get_url('chassis.create_view') }}" class="list-group-item list-group-item-action">
+          {% if setup_required.chassis %}
+          <span class="fa fa-solid fa-check-circle" style="padding-right: 20px;"></span>
+          {% else %}
+          <span class="fa fa-question-circle" style="padding-right: 20px;"></span>
+          {% endif %}
+          Create a chassis and assign drives
+        </a>
+        <a href="{{ get_url('jobs.index_view') }}" class="list-group-item list-group-item-action">
+          {% if setup_required.tasks %}
+          <span class="fa fa-solid fa-check-circle" style="padding-right: 20px;"></span>
+          {% else %}
+          <span class="fa fa-question-circle" style="padding-right: 20px;"></span>
+          {% endif %}
+          Schedule tasks
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- TrueNAS API Modal -->
+<div class="modal fade" id="truenas-setup-modal" tabindex="-1" role="dialog" aria-labelledby="truenas-setup-modal" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">TrueNAS API Connection</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form action="{{ get_url('setup.truenas') }}" id="truenas-setup-form" enctype="multipart/form-data" method="POST" role="form">
+          <div class="form-group">
+            <label for="truenas_url">TrueNAS URL</label>
+            <input class="form-control" id="truenas_url" placeholder="http://">
+            <small id="truenas-url-help" class="form-text text-muted">URL to TrueNAS server (including http or https)</small>
+          </div>
+          <div class="form-group">
+            <label for="truenas_api_key">API Key</label>
+            <input type="password" class="form-control" id="truenas_api_key">
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            <button type="submit" class="btn btn-primary">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block tail %}
+{{ super() }}
+<!-- JBOD Controller Modal -->
+<div class="modal fade" id="controller-setup-modal" tabindex="-1" role="dialog" aria-labelledby="controller-setup-modal" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">JBOD Controller Configuration</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form action="" id="controller-setup-form" enctype="multipart/form-data" method="POST" role="form">
+          <div class="form-group">
+            <label for="console_port">Serial Port</label>
+            <input class="form-control" id="console_port">
+            <small id="console-port-help" class="form-text text-muted">Controller port address (ie /dev/ttyS0, etc)</small>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            <button type="submit" class="btn btn-primary">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+$(function() {
+  modalFormHandler("truenas-setup-form", "{{ get_url('setup.truenas') }}");
+  modalFormHandler("controller-setup-form", "{{ get_url('setup.controller') }}");
+});
+</script>
+{% endblock %}
