@@ -1,62 +1,15 @@
 import os
-import logging
+import base64
 from flask import Flask
-from flask.logging import default_handler
+from sqlalchemy.exc import IntegrityError
 from flask_admin import Admin
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from apscheduler.events import EVENT_JOB_MISSED, EVENT_JOB_ERROR, EVENT_JOB_EXECUTED, EVENT_JOB_ADDED, \
     EVENT_JOB_REMOVED, EVENT_JOB_SUBMITTED
 
-
-# configuration defaults
-config_defaults = {
-    'timezone': 'America/Chicago',
-    'console_port': '/dev/ttyS0',
-    'baud_rate': '115600',
-    'console_timeout': 1,
-    'truenas_api_key': None,
-    'truenas_url': None,
-    'max_chassis_temp': 65,
-    'min_chassis_temp': 20,
-    'min_fan_pwm': 20,
-    'max_fan_pwm': 100,
-    'acpi_shutdown_script': None,
-    'acpi_startup_script': None
-}
-
-# task scheduler defaults
-scheduler_jobs = [
-    {
-        'job_id': 'query_disk_properties',
-        'func': 'ipmi.jobs:query_disk_properties',
-        'job_name': 'Query Disk Properties',
-        'description': 'TrueNAS API call to get disk properties.',
-        'hours': 1
-    }, {
-        'job_id': 'query_disk_temperatures',
-        'func': 'ipmi.jobs:query_disk_temperatures',
-        'job_name': 'Query Disk Temperatures',
-        'description': 'TrueNAS API call to get disk temperatures.',
-        'minutes': 1
-    }, {
-        'job_id': 'poll_setpoints',
-        'func': 'ipmi.jobs:poll_setpoints',
-        'job_name': 'Poll Fan Setpoints',
-        'description': 'Poll chassis temperature and set fan(s) PWM according to defined setpoint.',
-        'minutes': 2
-    }, {
-        'job_id': 'poll_fan_rpm',
-        'func': 'ipmi.jobs:poll_fan_rpm',
-        'job_name': 'Poll Fan RPMs',
-        'description': 'Poll controller to get latest fan RPM(s).',
-        'seconds': 30
-    }, {
-        'job_id': 'database_cleanup',
-        'func': 'ipmi.jobs:database_cleanup',
-        'job_name': 'Database Cleanup',
-        'description': 'Removes old data from database',
-        'hours': 2
-    },
-]
+from ipmi.config import config_defaults, scheduler_jobs
 
 
 def setup_flask_admin(app_instance, session):
@@ -81,6 +34,21 @@ def setup_flask_admin(app_instance, session):
     admin.add_view(vw.NewSetupView(name='Setup', endpoint='setup'))
 
     return app_instance
+
+
+def generate_key(salt, token) -> Fernet:
+    if not isinstance(salt, bytes):
+        salt = salt.encode()
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=480000,
+    )
+    if not isinstance(token, bytes):
+        token = token.encode()
+    key = base64.urlsafe_b64encode(kdf.derive(token))
+    return Fernet(key)
 
 
 def create_app(test_config=None):
@@ -111,22 +79,35 @@ def create_app(test_config=None):
 
     from ipmi import jobs
     from ipmi.models import db, SysConfig, SysJob
-    from ipmi.helpers import initial_db_setup, get_config_value, generate_key, \
-        disk_tooltip_html, svg_html_converter
+    from ipmi.helpers import get_config_value, disk_tooltip_html, svg_html_converter
 
     # initialize flask addons
     db.init_app(app)
     jobs.scheduler.init_app(app)
 
-    # Create the database if it doesn't already exist
-    if not os.path.exists(app.config['SQLALCHEMY_DATABASE_URI']):
-        with app.app_context():
-            db.create_all()
-            initial_db_setup(config_defaults, scheduler_jobs)
-
     with app.app_context():
-        _ceph = generate_key(app.config['SECRET_KEY'], app.config['SECRET_KEY_SALT'])
+        # Create the database if it doesn't already exist
+        if not os.path.exists(app.config['SQLALCHEMY_DATABASE_URI']):
+            db.create_all()
+            for k, v in config_defaults.items():
+                try:
+                    if k.endswith('_key'):
+                        db.session.add(SysConfig(key=k, value=v, encrypt=True))
+                    else:
+                        db.session.add(SysConfig(key=k, value=v, encrypt=False))
+                    db.session.commit()
+                except IntegrityError:
+                    db.session.rollback()
+            # add db placeholders for system jobs
+            for j in scheduler_jobs:
+                try:
+                    db.session.add(SysJob(**j))
+                    db.session.commit()
+                except IntegrityError:
+                    db.session.rollback()
+
         # setup encrypt & decrypt methods in app instance
+        _ceph = generate_key(app.config['SECRET_KEY'], app.config['SECRET_KEY_SALT'])
         app.__setattr__('encrypt', _ceph.encrypt)
         app.__setattr__('decrypt', _ceph.decrypt)
 
@@ -154,6 +135,6 @@ def create_app(test_config=None):
     app.jinja_env.globals.update(get_serial_connection=jobs.console_connection_check)
     app.jinja_env.globals.update(disk_tooltip_html=disk_tooltip_html)
     app.jinja_env.globals.update(svg_html_converter=svg_html_converter)
-
+    # app.jinja_env.globals.update(debug=debug)
     return app
 

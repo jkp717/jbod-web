@@ -152,12 +152,17 @@ class Chassis(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, unique=True)
     slot_cnt = db.Column(db.Integer, nullable=False)
-    psu_on = db.Column(db.Boolean, default=False)
     controller_id = db.Column(db.Integer, db.ForeignKey("controller.id"))
     phy_slots = db.relationship('PhySlot', back_populates='chassis', cascade="all, delete-orphan")
     controller = db.relationship('Controller', back_populates='chassis', uselist=False)
     create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
+
+    @hybrid_property
+    def psu_on(self):
+        if self.controller:
+            return getattr(self.controller, 'psu_on')
+        return None
 
     @hybrid_property
     def fans(self):
@@ -253,8 +258,12 @@ class Controller(db.Model):
     mcu_revision_id = db.Column(db.String)
     firmware_version = db.Column(db.String)
     fan_port_cnt = db.Column(db.Integer)
+    psu_on = db.Column(db.Boolean, default=False)
+    alive = db.Column(db.Boolean, default=False)
     fans = db.relationship('Fan', back_populates='controller', cascade="all, delete-orphan")
     chassis = db.relationship('Chassis', back_populates='controller', uselist=False)
+    create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
     __table_args__ = (
         db.UniqueConstraint(
             'mcu_device_id',

@@ -5,7 +5,15 @@ import time
 from enum import Enum
 
 
-class JBODConsoleAckException(Exception):
+class JBODConsoleException(Exception):
+    pass
+
+
+class JBODConsoleTimeoutException(JBODConsoleException):
+    pass
+
+
+class JBODConsoleAckException(JBODConsoleException):
     """
     NAK acknowledgement received exception
     """
@@ -116,7 +124,8 @@ class JBODRxData:
         for prop in ['ack', 'xon', 'xoff']:
             self.__setattr__(prop, d[0].encode(self.ENCODING))
         try:
-            self._data = d[1].encode(self.ENCODING)
+            # self._data = d[1].encode(self.ENCODING)
+            self._data = d[1]
         except IndexError:
             self._data = None
 
@@ -129,8 +138,9 @@ class JBODConsole:
     ENCODING = 'ASCII'
     NEW_RX_DATA = False
     NEW_TX_DATA = False
+    DEBUG = True
 
-    def __init__(self, serial_instance, rx_callback: Optional[callable] = None):
+    def __init__(self, serial_instance: serial.Serial, callback: Optional[callable] = None):
         self.cmd = JBODCommand
         self.ctrlc = JBODControlCharacter
         self.serial = serial_instance
@@ -140,10 +150,9 @@ class JBODConsole:
         self._reader_alive = False
         self._rx_buffer = None
         self._tx_buffer = None
-        self._rx_callback = rx_callback
+        self._callback = callback
         self._data_received = bytearray()
         self._lock = threading.Lock()
-        self.serial.open()
 
     def _start_reader(self):
         """Start reader thread"""
@@ -152,7 +161,6 @@ class JBODConsole:
         self.receiver_thread = threading.Thread(target=self.reader, name='rx')
         self.receiver_thread.daemon = True
         self.receiver_thread.start()
-        print(f"Hello from receiver thread {self.receiver_thread}")
 
     def _stop_reader(self):
         """Stop reader thread only, wait for clean exit of thread"""
@@ -163,13 +171,14 @@ class JBODConsole:
 
     def start(self):
         """start worker threads"""
+        if not self.serial.is_open:
+            self.serial.open()
         self.alive = True
         self._start_reader()
         # enter console->serial loop
         self.transmitter_thread = threading.Thread(target=self.writer, name='tx')
         self.transmitter_thread.daemon = True
         self.transmitter_thread.start()
-        print(f"Hello from transmitter thread {self.transmitter_thread}")
 
     def stop(self):
         """set flag to stop worker threads"""
@@ -207,9 +216,9 @@ class JBODConsole:
                             time.sleep(0.1)
                             retries += 1
                         # passing to callback if data has not been processed
-                        if self._rx_callback and self.NEW_RX_DATA:
+                        if self._callback and self.NEW_RX_DATA:
                             # will clear NEW_RX_DATA flag
-                            self._rx_callback(JBODRxData(bytes(self.rx_buffer)))
+                            self._callback.event_handler(JBODRxData(bytes(self.rx_buffer)))
                 time.sleep(0.01)
         except serial.SerialException as err:
             self.alive = False
@@ -245,16 +254,19 @@ class JBODConsole:
         """Blocking write command and return JBODRxData"""
         self.flush_buffers()
         if isinstance(command, JBODCommand):
-            command = self._command_format(command, tuple(args) if args else None)
+            fmt_command = self._command_format(command, tuple(args) if args else None)
         else:
-            command = command.value
-        b = bytearray(str(command), self.ENCODING)  # convert str to bytearray
+            fmt_command = command.value
+        b = bytearray(str(fmt_command), self.ENCODING)  # convert str to bytearray
         b.extend(self.TERMINATOR)  # add terminator to end of bytearray
+        if self.DEBUG:
+            if bytes(b) in ack_tests.keys():
+                b = ack_tests[bytes(b)]
         self.serial.write(bytes(b))  # convert bytearray to bytes
         resp = JBODRxData(self.receive_now())
         if not resp.ack:
             raise JBODConsoleAckException(
-                command_req=command,
+                command_req=fmt_command,
                 command_args=[*args],
                 response=resp.raw_data
             )
@@ -291,7 +303,10 @@ class JBODConsole:
         while retries < 100 and not self.NEW_RX_DATA:
             time.sleep(0.01)
             retries += 1
-        return self.rx_buffer
+        if self.NEW_RX_DATA:
+            return self.rx_buffer
+        else:
+            raise JBODConsoleTimeoutException("JBODConsole receive_now timed out.")
 
     @property
     def tx_buffer(self):
@@ -307,6 +322,14 @@ class JBODConsole:
         else:
             self.NEW_TX_DATA = True
         self._tx_buffer = data
+
+    @property
+    def callback(self) -> Optional[callable]:
+        return self._callback
+
+    @callback.setter
+    def callback(self, func: callable):
+        self._callback = func
 
     def transmit(self, data: bytes):
         # sets NEW_TX_DATA flag when set
@@ -339,3 +362,23 @@ class JBODConsole:
                 raise e
             # and restart the reader thread
             self._start_reader()
+
+
+ack_tests = {
+    "jbod/1 id\r\n".encode("ASCII"): "\x06\x00{id:0x466,lot:0x2038344B513050,waf:0x19,rev:0x1003}\x00\r\n".encode('ASCII'),
+    "jbod/2 id\r\n".encode("ASCII"): "\x06\x00{id:0x467,lot:0x2038344B516054,waf:0x20,rev:0x1004}\x00\r\n".encode('ASCII'),
+    "jbod/1 fans\r\n".encode("ASCII"): "\x06\x004\x00\r\n".encode("ASCII"),
+    "jbod/2 fans\r\n".encode("ASCII"): "\x06\x004\x00\r\n".encode("ASCII"),
+    "jbod/1 version\r\n".encode("ASCII"): "\x06\x00v2.0.0\x00\r\n".encode("ASCII"),
+    "jbod/2 version\r\n".encode("ASCII"): "\x06\x00v2.0.0\x00\r\n".encode("ASCII"),
+    "jbod/1 rpm fan/1\r\n".encode("ASCII"): "\x06\x002000\x00\r\n".encode('ASCII'),
+    "jbod/1 rpm fan/2\r\n".encode("ASCII"): "\x06\x002050\x00\r\n".encode('ASCII'),
+    "jbod/1 rpm fan/3\r\n".encode("ASCII"): "\x06\x000\x00\r\n".encode('ASCII'),
+    "jbod/1 rpm fan/4\r\n".encode("ASCII"): "\x06\x001540\x00\r\n".encode('ASCII'),
+    "jbod/2 rpm fan/1\r\n".encode("ASCII"): "\x06\x002000\x00\r\n".encode('ASCII'),
+    "jbod/2 rpm fan/2\r\n".encode("ASCII"): "\x06\x002050\x00\r\n".encode('ASCII'),
+    "jbod/2 rpm fan/3\r\n".encode("ASCII"): "\x06\x000\x00\r\n".encode('ASCII'),
+    "jbod/2 rpm fan/4\r\n".encode("ASCII"): "\x06\x001540\x00\r\n".encode('ASCII'),
+    "jbod/1 psu status\r\n".encode("ASCII"): "\x06\x00ON\x00\r\n".encode('ASCII'),
+    "jbod/2 psu status\r\n".encode("ASCII"): "\x06\x00ON\x00\r\n".encode('ASCII'),
+}

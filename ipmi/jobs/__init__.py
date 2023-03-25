@@ -1,14 +1,14 @@
 import requests
 import time
-from typing import Iterable, Optional, Union
+from typing import Optional, Union
 from flask import current_app
-from ipmi.models import db, SysConfig, Disk, DiskTemp, Chassis, Fan, FanSetpoint, Controller, PhySlot
 from sqlalchemy.sql import text
 from flask_apscheduler import APScheduler
-from ipmi.jobs.console import JBODConsoleAckException, JBODCommand, JBODRxData, JBODControlCharacter
-from ipmi import helpers
-from ipmi.jobs.console import JBODConsole
 from serial import SerialException, serial_for_url
+from ipmi.models import db, SysConfig, Disk, DiskTemp, Chassis, Fan, FanSetpoint, Controller, PhySlot
+from ipmi.console import JBODCommand, \
+    JBODRxData, JBODConsole, JBODConsoleException
+from ipmi import helpers
 from ipmi.jobs import events as ev
 
 
@@ -25,7 +25,7 @@ def get_console() -> Union[JBODConsole, None]:
                         baudrate=int(helpers.get_config_value('baud_rate')),
                         timeout=int(helpers.get_config_value('console_timeout')),
                         do_not_open=True),
-                    rx_callback=console_rx_callback
+                    callback=helpers.truenas_callback
                 )
                 tty.start()
                 current_app.__setattr__('console', tty)
@@ -65,34 +65,9 @@ def truenas_connection_info():
             return None
 
 
-def _truenas_api_request(method: str, url_path: str, headers: dict = None, data: dict = None):
-    if headers is None:
-        headers = {}
-    with current_app.app_context():
-        api_key = db.session.execute(
-            db.select(SysConfig).where(SysConfig.key == "truenas_api_key")
-        ).first()
-        base_url = db.session.execute(
-            db.select(SysConfig).where(SysConfig.key == "truenas_url")
-        ).first()
-        if getattr(api_key[0], 'value', None) and getattr(base_url[0], 'value', None):
-            if getattr(api_key[0], 'encrypt'):
-                _api_key = current_app.decrypt(getattr(api_key[0], 'value')).decode()
-            else:
-                _api_key = getattr(api_key[0], 'value')
-            _base_url = getattr(base_url[0], 'value')
-            _headers = {
-                'Authorization': f"Bearer {_api_key}",
-                'accept': '*/*',
-                **headers
-            }
-            return requests.request(method, f"{_base_url}{url_path}", headers=_headers, json=data, timeout=10)
-        return None
-
-
 def query_disk_properties() -> None:
     with scheduler.app.app_context():
-        resp = _truenas_api_request('GET', '/api/v2.0/disk')
+        resp = helpers.truenas_api_request('GET', '/api/v2.0/disk')
         if resp:
             zfs_props = _query_zfs_properties()
             for disk in resp.json():
@@ -119,7 +94,7 @@ def query_disk_temperatures() -> None:
         disks = db.session.query(Disk).all()
         if not disks:
             raise Exception("query_disk_temperatures scheduled job skipped. No disks to query.")
-        resp = _truenas_api_request(
+        resp = helpers.truenas_api_request(
             'POST',
             '/api/v2.0/disk/temperatures',
             headers={'Content-Type': 'application/json'},
@@ -137,7 +112,7 @@ def query_disk_temperatures() -> None:
 
 def _query_zfs_properties() -> dict:
     """Ran inside query disk properties job"""
-    resp = _truenas_api_request('GET', '/api/v2.0/pool')
+    resp = helpers.truenas_api_request('GET', '/api/v2.0/pool')
     if resp.status_code == 200:
         data = resp.json()
         disks = {}
@@ -164,7 +139,7 @@ def _query_zfs_properties() -> dict:
 
 def query_host_state() -> str:
     # states = ['BOOTING', 'READY', 'SHUTTING_DOWN']
-    resp = _truenas_api_request('GET', '/api/v2.0/system/state')
+    resp = helpers.truenas_api_request('GET', '/api/v2.0/system/state')
     if resp:
         return resp.text
     return 'UNKNOWN'
@@ -287,49 +262,71 @@ def poll_fan_rpm() -> None:
         scheduler.app.logger.debug("task poll_fan_rpm completed")
 
 
-def ping_controllers() -> Optional[int]:
-    """
-    Sends an Enquiry request to master controller, which is propagated down to
-    each attached controller.
+def _controller_property_mapper(data: str) -> dict:
+    """converts DEVICE_ID command response to dict"""
+    props = {}
+    dev_id_map = {
+        'id': 'mcu_device_id',
+        'lot': 'mcu_lot_id',
+        'waf': 'mcu_wafer_id',
+        'rev': 'mcu_revision_id'
+    }
+    # assign model attrs based on mapper
+    for id_type in data.strip().strip("{}").split(","):
+        props[dev_id_map.get(id_type.split(':')[0])] = id_type.split(':')[1]
+    return props
 
-    :return: Count of acknowledgements received (controller count)
+
+def ping_controllers(controller_id: Optional[int] = None) -> Union[list[dict], list[None]]:
     """
+    Loop increments id calling DEVICE_ID command until either NAK or no response
+    @param controller_id: will only ping this controller if provided
+    @return: list of device properties from responses
+    """
+    with current_app.app_context():
+        resp = []
+        next_id = controller_id or 1
+        tty = get_console()
+        while True:
+            # continue to loop until either NAK or no response
+            try:
+                dev_id = tty.command_write(JBODCommand.DEVICE_ID, next_id)
+                resp.append({"id": next_id, **_controller_property_mapper(str(dev_id.data))})
+            except JBODConsoleException:
+                break
+            if next_id == controller_id:
+                break
+            next_id += 1
+        return resp
+
+
+def query_controller_properties(controller: Controller) -> Controller:
     with scheduler.app.app_context():
         tty = get_console()
         if not tty:
             raise SerialException("Serial connection not established.")
-        responses = []
-        # ack = tty.command_write(tty.ctrlc.ENQ)
-        # TODO: Fix this to work with new console class
-        return 0
+        try:
+            # returns a json like object with id, lot, waf, rev properties
+            dev_id = tty.command_write(JBODCommand.DEVICE_ID, controller.id)
+            for k, v in _controller_property_mapper(str(dev_id.data)).items():
+                setattr(controller, k, v)
 
+            # get total fan ports supported by controller
+            fc = tty.command_write(JBODCommand.FAN_CNT, controller.id)
+            controller.fan_port_cnt = int(fc.data)
 
-def query_controller_properties(controller: Controller) -> Optional[Controller]:
-    with scheduler.app.app_context():
-        tty = get_console()
-        if not tty:
-            raise SerialException("Serial connection not established.")
-        dev_id_mapper = {
-            'id': 'mcu_device_id',
-            'lot': 'mcu_lot_id',
-            'waf': 'mcu_wafer_id',
-            'rev': 'mcu_revision_id'
-        }
-        # returns a json like object with id, lot, waf, rev properties
-        did = tty.command_write(JBODCommand.DEVICE_ID, controller.id)
-        dev_id = str(did.data)
-        # assign model attrs based on mapper
-        for id_type in dev_id.strip().strip("{}").split(","):
-            setattr(controller, dev_id_mapper.get(id_type.split(':')[0]), id_type.split(':')[1])
+            # get firmware version
+            fw = tty.command_write(JBODCommand.FIRMWARE_VERSION, controller.id)
+            controller.firmware_version = fw.data
 
-        # get total fan ports supported by controller
-        fc = tty.command_write(JBODCommand.FAN_CNT, controller.id)
-        controller.fan_port_cnt = int(fc.data)
+            # get PSU status
+            psu = tty.command_write(JBODCommand.STATUS, controller.id)
+            print('psu', psu)
+            controller.psu_on = psu.data == 'ON'
 
-        # get firmware version
-        fw = tty.command_write(JBODCommand.FIRMWARE_VERSION, controller.id)
-        controller.firmware_version = fw.data
-
+            controller.alive = True
+        except JBODConsoleException:
+            controller.alive = False
         # return updated model
         return controller
 

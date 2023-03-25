@@ -1,20 +1,17 @@
 import os
 import math
+import requests
 from typing import Optional, Iterable, Union
 from enum import IntEnum
 from dateutil import tz
-from sqlalchemy.exc import IntegrityError
-from flask import Markup, current_app
+from flask import Markup, current_app, Flask
 from flask_admin.helpers import url_for
 from datetime import datetime
 from flask_admin.model import typefmt
 from flask_admin.model.template import TemplateLinkRowAction
-from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-import base64
 
-from ipmi.models import db, FanSetpoint, SysConfig, SysJob, Celsius, Disk
+from ipmi.models import db, FanSetpoint, SysConfig, Disk, Controller, Fan
+from ipmi.console import JBODRxData, JBODConsole, JBODCommand, JBODConsoleException
 
 
 class StatusFlag(IntEnum):
@@ -25,45 +22,34 @@ class StatusFlag(IntEnum):
     ERROR = 4
 
 
-def generate_key(salt, token) -> Fernet:
-    if not isinstance(salt, bytes):
-        salt = salt.encode()
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=salt,
-        iterations=480000,
-    )
-    if not isinstance(token, bytes):
-        token = token.encode()
-    key = base64.urlsafe_b64encode(kdf.derive(token))
-    return Fernet(key)
-
-
 def get_config_value(config_param: str):
     with current_app.app_context():
         return db.session.query(SysConfig.value).where(SysConfig.key == config_param).first()[0]
 
 
-def initial_db_setup(config_defaults: dict, scheduler_jobs: []) -> None:
+def truenas_api_request(method: str, url_path: str, headers: dict = None, data: dict = None):
+    if headers is None:
+        headers = {}
     with current_app.app_context():
-        # populate default configuration values
-        for k, v in config_defaults.items():
-            try:
-                if k.endswith('_key'):
-                    db.session.add(SysConfig(key=k, value=v, encrypt=True))
-                else:
-                    db.session.add(SysConfig(key=k, value=v, encrypt=False))
-                db.session.commit()
-            except IntegrityError:
-                db.session.rollback()
-        # add db placeholders for system jobs
-        for j in scheduler_jobs:
-            try:
-                db.session.add(SysJob(**j))
-                db.session.commit()
-            except IntegrityError:
-                db.session.rollback()
+        api_key = db.session.execute(
+            db.select(SysConfig).where(SysConfig.key == "truenas_api_key")
+        ).first()
+        base_url = db.session.execute(
+            db.select(SysConfig).where(SysConfig.key == "truenas_url")
+        ).first()
+        if getattr(api_key[0], 'value', None) and getattr(base_url[0], 'value', None):
+            if getattr(api_key[0], 'encrypt'):
+                _api_key = current_app.decrypt(getattr(api_key[0], 'value')).decode()
+            else:
+                _api_key = getattr(api_key[0], 'value')
+            _base_url = getattr(base_url[0], 'value')
+            _headers = {
+                'Authorization': f"Bearer {_api_key}",
+                'accept': '*/*',
+                **headers
+            }
+            return requests.request(method, f"{_base_url}{url_path}", headers=_headers, json=data, timeout=10)
+        return None
 
 
 def disk_tooltip_html(model: Union[Disk, None]) -> str:
@@ -199,3 +185,47 @@ def resolve_string_attr(obj: object, attr: str, level: int = None) -> Union[list
         else:
             obj = obj.get(name)
     return obj
+
+
+def truenas_callback(tty: JBODConsole, data: JBODRxData):
+    with current_app.app_context():
+        if data.xoff:
+            current_app.logger.info("Shutdown request received from controller. "
+                                    "Attempting to shutdown host now.")
+            resp = truenas_api_request(
+                'POST',
+                '/api/v2.0/system/shutdown',
+                headers={'Content-Type': 'application/json'},
+                data={"delay": 0}
+            )
+            if resp.status_code == 200:
+                current_app.logger.info("Host confirmed shutdown request. Shutting down...")
+            else:
+                # shutdown failed; send cancellation to all controllers
+                for controller in db.session.query(Controller).all():
+                    try:
+                        tty.command_write(JBODCommand.CANCEL_SHUTDOWN, controller.id)
+                    except JBODConsoleException:
+                        pass
+        elif data.xon:
+            current_app.logger.warning("ACPI ON Event received but host is already on! %s", data)
+        else:
+            # Uncaught event
+            current_app.logger.warning("Uncaught console event received: %s", data)
+
+
+def cascade_controller_fan(model: Controller, *args, **kwargs):
+    db_fans = db.session.query(db.func.count(Fan.id)).where(Fan.controller_id == model.id).first()[0]
+    if db_fans < model.fan_port_cnt:
+        for i in range(db_fans, model.fan_port_cnt):
+            db.session.flush()  # flush to populate autoincrement id
+            f = Fan(controller_id=model.id, port_num=i+1)
+            db.session.add(f)
+            cascade_add_setpoints(f.id)  # create default setpoints for new fans
+    elif db_fans > model.fan_port_cnt:
+        del_rows = db.session.query(Fan) \
+            .filter(Fan.port_num > model.fan_port_cnt, Fan.controller_id == model.id) \
+            .all()
+        for row in del_rows:
+            db.session.delete(row)
+        db.session.commit()

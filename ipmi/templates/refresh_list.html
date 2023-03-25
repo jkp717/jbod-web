@@ -1,7 +1,8 @@
 {% extends 'admin/model/list.html' %}
 
+
 {% block model_menu_bar_after_filters %}
 <li class="nav-item">
-    <a href="{{ get_url('.refresh') }}" class="nav-link">Refresh</a>
+    <a href="{{ get_url(admin_view.refresh_view) }}" class="nav-link">Refresh</a>
 </li>
 {% endblock %}

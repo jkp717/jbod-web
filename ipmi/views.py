@@ -13,9 +13,8 @@ from serial.tools.list_ports import comports
 
 from ipmi import helpers
 from ipmi.models import db, PhySlot, FanSetpoint, Fan, Controller, SysConfig, Chassis, SysJob
-from ipmi.jobs.console import JBODConsoleAckException
-from ipmi.jobs import scheduler, query_disk_properties, query_controller_properties, ping_controllers, \
-    truenas_connection_info, get_console
+from ipmi.jobs import scheduler, query_disk_properties, query_controller_properties, \
+    truenas_connection_info, get_console, ping_controllers
 from ipmi.jobs.events import fan_calibration_job_listener
 
 
@@ -285,6 +284,7 @@ class DiskView(JBODBaseView):
     can_create = False
     can_delete = False
     can_export = True
+    refresh_view = '.refresh'
     list_template = 'refresh_list.html'
     # column_editable_list = ['phy_slot']
     form_columns = ['phy_slot']
@@ -295,6 +295,9 @@ class DiskView(JBODBaseView):
     ]
     column_formatters = {'size': helpers.disk_size_formatter}
     # form_excluded_columns = JBODBaseView.form_excluded_columns + ['disk_temps', ]
+
+    def get_empty_list_message(self):
+        return Markup(f"<a href={self.get_url('.refresh')}>Refresh Disks</a>")
 
     @expose('/refresh')
     def refresh(self):
@@ -358,71 +361,84 @@ class ControllerView(JBODBaseView):
     # can_create = False
     can_create = True
     can_edit = False
+    refresh_view = '.ping'
     list_template = 'refresh_list.html'
 
     def get_empty_list_message(self):
-        return Markup(f"<a href={self.get_url('.setup')}>Search for connected Controllers</a>")
+        return Markup(f"<a href={self.get_url('.ping')}>Search for connected Controllers</a>")
 
     def on_model_delete(self, model):
         if model.chassis:
             fans = db.session.query(Fan) \
-                .filter(Fan.chassis_id == model.chassis.id) \
+                .where(Fan.controller_id == model.id) \
                 .all()
             for row in fans:
                 db.session.delete(row)
             db.session.commit()
 
     def on_model_change(self, form, model, is_created):
-        db_fans = db.session.query(db.func.count(Fan.id)).where(Fan.controller_id == model.id).first()[0]
-        if db_fans < model.fan_port_cnt:
-            for i in range(db_fans, model.fan_port_cnt):
-                f = Fan(controller_id=model.id, port_num=i)
-                db.session.add(f)
-                db.session.flush()  # flush to populate autoincrement id
-                helpers.cascade_add_setpoints(f.id)  # create default setpoints for new fans
-        elif db_fans > model.fan_port_cnt:
-            del_rows = db.session.query(Fan) \
-                .filter(Fan.port_num > model.fan_port_cnt, Fan.controller_id == model.id) \
-                .all()
-            for row in del_rows:
-                db.session.delete(row)
-            db.session.commit()
+        helpers.cascade_controller_fan(model, form, is_created)
 
-    @expose('/ping')
+    @expose('/ping', methods=['GET'])
     def ping(self):
-        ack_cnt = ping_controllers()
-        if not ack_cnt:
-            return jsonify({'result': 'error', 'msg': 'Controller(s) did not respond to ping.'}), 200
-        db_count = db.session.query(db.func.count(Controller.id)).first()
-        if db_count == ack_cnt:
-            return jsonify({'result': 'ready', 'ack_count': ack_cnt, 'db_count': db_count}), 200
-        return jsonify({'result': 'error', 'ack_count': ack_cnt, 'db_count': db_count}), 400
-
-    @expose('/refresh')
-    def refresh(self):
-        return redirect(self.get_url('.setup'))
-
-    @expose('/setup')
-    def setup(self):
-        ack_cnt = ping_controllers()
-        if not ack_cnt:
-            flash('No response from controller(s). Check connection settings and try again.', 'error')
-            return redirect(self.get_url('.index_view'))
-        for i in range(ack_cnt):
-            existing = db.session.query(Controller).where(Controller.id == i+1).first()
-            c_model = existing if existing else Controller(id=i+1)
-            try:
-                # Get mcu UUID, firmware version, and supported fan count
-                c_model = query_controller_properties(c_model)
-            except JBODConsoleAckException as err:
-                db.session.rollback()
-                flash(err.message, 'error')
-                return redirect(self.get_url('.index_view'))
-            # add new models
-            if not existing:
-                db.session.add(c_model)
+        if not request.args.get('id'):
+            controllers = db.session.query(Controller).all()
+            # send out ping to controller group (looks for new controllers)
+            responses = ping_controllers()
+        else:
+            controllers = db.session.query(Controller).where(Controller.id == int(request.args.get('id'))).all()
+            responses = ping_controllers(int(request.args.get('id')))
+        db_ids = [c.id for c in controllers] if controllers else []
+        r_ids = [r['id'] for r in responses] if responses else []
+        # tests
+        new_c = set(r_ids).difference(set(db_ids))
+        dead_c = set(db_ids).difference(set(r_ids))
+        ack_c = set(db_ids).intersection(set(r_ids))
+        # update existing alive controllers
+        for alive_id in ack_c:
+            ca = helpers.get_model_by_id(Controller, alive_id)
+            ca.alive = True
+        # update dead controllers
+        for old_id in dead_c:
+            cd = helpers.get_model_by_id(Controller, old_id)
+            if request.args.get('action') == 'delete':
+                db.session.delete(cd)
+                helpers.cascade_controller_fan(cd)
+            else:
+                cd.alive = False
         db.session.commit()
-        flash('Controller(s) properties updated!', 'message')
+        if request.args.get('action') == 'add':
+            for new_id in new_c:
+                c_model = query_controller_properties(Controller(id=int(new_id)))
+                if not c_model.alive:
+                    flash("Oops! There was a problem communicating with controller. Try again.")
+                    return redirect(self.get_url('.index_view')), 500
+                db.session.add(c_model)
+                helpers.cascade_controller_fan(c_model)
+            db.session.commit()
+        if request.is_json:
+            return jsonify({'result': 'ready', 'controllers': {
+                'acknowledged': ack_c, 'dead': dead_c, 'new': new_c}}), 200
+        # handle HTML request
+        flash_msg = ""
+        if len(new_c) > 0:
+            flash_msg += f"{len(new_c)} new controller(s) found! "
+        if len(dead_c) > 0:
+            flash_msg += f"{len(dead_c)} controller(s) are not responding to ping. "
+        if request.args.get('action'):
+            if len(new_c) > 0 or len(dead_c) > 0:
+                flash_msg += "Database updated."
+        elif len(new_c) > 0:
+            flash_msg += Markup(f"""
+            <a href="{self.get_url('.ping', action='add')}" class="alert-link">Add new controller?</a>
+            """)
+        elif len(dead_c) > 0:
+            flash_msg += Markup(f"""
+            <a href="{self.get_url('.ping', action='delete')}" class="alert-link">Remove controller?</a>
+            """)
+        else:
+            flash_msg += f"{len(ack_c)} controllers responded. No changes needed."
+        flash(flash_msg)
         return redirect(self.get_url('.index_view'))
 
 
