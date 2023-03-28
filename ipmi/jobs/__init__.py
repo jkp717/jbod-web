@@ -5,8 +5,7 @@ from sqlalchemy.sql import text
 from flask_apscheduler import APScheduler
 from serial import SerialException, serial_for_url
 from ipmi.models import db, SysConfig, Disk, DiskTemp, Chassis, Fan, FanSetpoint, Controller, PhySlot
-from ipmi.console import JBODCommand, \
-    JBODRxData, JBODConsole, JBODConsoleException
+from ipmi.console import JBODCommand, JBODConsole, JBODConsoleException
 from ipmi import helpers
 from ipmi.jobs import events as ev
 from ipmi.config import MIN_FAN_PWM, MAX_FAN_PWM

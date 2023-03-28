@@ -68,10 +68,11 @@ logging_config = {
             'formatter': 'default'
         },
         'file_log': {
-            'class': 'logging.RotatingFileHandler',
+            'class': 'logging.handlers.RotatingFileHandler',
             'filename': 'ipmi.log',
             'maxBytes': 20000,
-            'backupCount': 3
+            'backupCount': 3,
+            'formatter': 'default'
         }
     },
     'root': {
