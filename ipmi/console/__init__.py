@@ -176,7 +176,7 @@ class JBODConsole:
     NEW_TX_DATA = False
     TESTING = False
 
-    def __init__(self, serial_instance: serial.Serial, callback: Optional[callable] = None):
+    def __init__(self, serial_instance: serial.Serial, callback: Optional[callable] = None, **kwargs):
         self.cmd = JBODCommand
         self.ctrlc = JBODControlCharacter
         self.serial = serial_instance
@@ -189,6 +189,10 @@ class JBODConsole:
         self._callback = callback
         self._data_received = bytearray()
         self._lock = threading.Lock()
+        if kwargs.get('cxt'):
+            self.cxt = kwargs.get('cxt')
+        else:
+            self.cxt = None
 
     def _start_reader(self):
         """Start reader thread"""
@@ -197,6 +201,7 @@ class JBODConsole:
         self.receiver_thread = threading.Thread(target=self.reader, name='rx')
         self.receiver_thread.daemon = True
         self.receiver_thread.start()
+        print(f"hello from receiver_thread: {self.receiver_thread}")
 
     def _stop_reader(self):
         """Stop reader thread only, wait for clean exit of thread"""
@@ -215,6 +220,7 @@ class JBODConsole:
         self.transmitter_thread = threading.Thread(target=self.writer, name='tx')
         self.transmitter_thread.daemon = True
         self.transmitter_thread.start()
+        print("hello from transmitter_thread")
 
     def stop(self):
         """set flag to stop worker threads"""
@@ -253,7 +259,7 @@ class JBODConsole:
                         # passing to callback if data has not been processed
                         if self._callback and self.NEW_RX_DATA:
                             # will clear NEW_RX_DATA flag
-                            self._callback.event_handler(JBODRxData(bytes(self.rx_buffer)))
+                            self._callback(self, JBODRxData(bytes(self.rx_buffer)), cxt=self.cxt)
                 time.sleep(0.01)
         except serial.SerialException as err:
             self.alive = False
@@ -297,13 +303,13 @@ class JBODConsole:
             fmt_command = command.value
         b = bytearray(str(fmt_command), self.ENCODING)  # convert str to bytearray
         b.extend(self.TERMINATOR)  # add terminator to end of bytearray
-        if self.TESTING:
-            if bytes(b) in ack_tests.keys():
-                b = ack_tests[bytes(b)]
-            else:
-                for k, v in ack_tests.items():
-                    if isinstance(k, re.Pattern):
-                        b = v if self._command_match(k, bytes(b).decode('ASCII')) else b
+        # if self.TESTING:
+        #     if bytes(b) in ack_tests.keys():
+        #         b = ack_tests[bytes(b)]
+        #     else:
+        #         for k, v in ack_tests.items():
+        #             if isinstance(k, re.Pattern):
+        #                 b = v if self._command_match(k, bytes(b).decode('ASCII')) else b
         self.serial.write(bytes(b))  # convert bytearray to bytes
         resp = JBODRxData(self.receive_now())
         if not resp.ack:

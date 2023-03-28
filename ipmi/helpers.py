@@ -6,7 +6,7 @@ import requests
 from typing import Optional, Iterable, Union
 from enum import IntEnum
 from dateutil import tz
-from flask import Markup, current_app
+from flask import Markup, current_app, Flask
 from flask_admin.helpers import url_for
 from datetime import datetime
 from flask_admin.model import typefmt
@@ -197,15 +197,12 @@ def _test_callback(tty: JBODConsole, data: JBODRxData):
     sys.stdout.write(f"test_callback triggered! Data Received: {data}\n")
 
 
-def console_callback(tty: JBODConsole, rx: JBODRxData):
+def console_callback(tty: JBODConsole, rx: JBODRxData, cxt: Flask):
     """Update for non-truenas Hosts"""
-    with current_app.app_context():
-        if current_app.config.get('TESTING'):
-            _test_callback(tty, rx)
-            return
+    with cxt.app_context():
         if rx.xoff:
-            current_app.logger.info("Shutdown request received from controller. "
-                                    "Attempting to shutdown host now.")
+            cxt.logger.info("Shutdown request received from controller. "
+                            "Attempting to shutdown host now.")
             resp = truenas_api_request(
                 'POST',
                 '/api/v2.0/system/shutdown',
@@ -213,7 +210,7 @@ def console_callback(tty: JBODConsole, rx: JBODRxData):
                 data={"delay": 0}
             )
             if resp.status_code == 200:
-                current_app.logger.info("Host confirmed shutdown request. Shutting down...")
+                cxt.logger.info("Host confirmed shutdown request. Shutting down...")
             else:
                 # shutdown failed; send cancellation to all controllers
                 for controller in db.session.query(Controller).all():
@@ -222,11 +219,11 @@ def console_callback(tty: JBODConsole, rx: JBODRxData):
                     except JBODConsoleException:
                         pass
         elif rx.xon:
-            current_app.logger.warning("ACPI ON Event received but host is already on! %s", rx)
+            cxt.logger.warning("ACPI ON Event received but host is already on! %s", rx)
         elif rx.dc2:
             # Device Control 2 used to broadcast rpm on all fans
             # response example: {466-2038344B513050-19-1003:[1000,1200,0,3000]}
-            current_app.logger.debug("Attempting to parse rpm data: %s", rx)
+            cxt.logger.debug("Attempting to parse rpm data: %s", rx)
             try:
                 resp = str(rx.data).strip("{}")
                 c_id, arr_str = resp.split(":")[0], resp.split(":")[1]
@@ -241,18 +238,18 @@ def console_callback(tty: JBODConsole, rx: JBODRxData):
                             fan.rpm_deviation = fan_rpm_deviation(fan)
                             db.session.commit()
             except IndexError:
-                current_app.logger.error("Unable to parse rpm data from: %s", rx)
+                cxt.logger.error("Unable to parse rpm data from: %s", rx)
         elif rx.dc4:
             # misc controller event messages
             resp = str(rx.data).strip("{}")
             msg_type, msg_body = resp.split(":")[0], resp.split(":")[1]
             if msg_type == 'reset_event':
                 rst_code = ResetEvent(int(msg_body)).name
-                current_app.logger.warning("Controller reset event: %s", rst_code)
+                cxt.logger.warning("Controller reset event: %s", rst_code)
             else:
-                current_app.logger.warning("Unknown ds4 event message received: %s", rx)
+                cxt.logger.warning("Unknown ds4 event message received: %s", rx)
         else:
-            current_app.logger.warning("Uncaught console event received: %s", rx)
+            cxt.logger.warning("Uncaught console event received: %s", rx)
 
 
 def cascade_controller_fan(model: Controller, *args, **kwargs):

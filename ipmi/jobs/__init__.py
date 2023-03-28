@@ -30,7 +30,8 @@ def get_console() -> Union[JBODConsole, None]:
                         baudrate=int(helpers.get_config_value('baud_rate')),
                         timeout=int(helpers.get_config_value('console_timeout')),
                         do_not_open=True),
-                    callback=helpers.console_callback
+                    callback=helpers.console_callback,
+                    cxt=current_app
                 )
                 tty.start()
                 current_app.__setattr__('console', tty)
