@@ -66,10 +66,16 @@ logging_config = {
             'class': 'logging.StreamHandler',
             'stream': 'ext://flask.logging.wsgi_errors_stream',
             'formatter': 'default'
+        },
+        'file_log': {
+            'class': 'logging.RotatingFileHandler',
+            'filename': 'ipmi.log',
+            'maxBytes': 20000,
+            'backupCount': 3
         }
     },
     'root': {
-        'level': 'DEBUG',
-        'handlers': ['wsgi']
+        'level': 'INFO',
+        'handlers': ['wsgi', 'file_log']
     }
 }

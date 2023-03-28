@@ -13,6 +13,10 @@ from apscheduler.events import EVENT_JOB_MISSED, EVENT_JOB_ERROR, EVENT_JOB_EXEC
 from ipmi.config import config_defaults, scheduler_jobs, logging_config
 
 
+# run the following to start server
+# sudo gunicorn -w 1 -b 0.0.0.0 'ipmi:create_app()' --threads 3
+
+
 dictConfig(logging_config)
 
 

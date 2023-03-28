@@ -299,12 +299,12 @@ def fan_calibration(fan_id: int) -> None:
         fan_model = helpers.get_model_by_id(Fan, fan_id)
         # pwm fan‘s speed scales broadly linear with the duty-cycle of the PWM signal between
         # maximum speed at 100% PWM and the specified minimum speed at 20% PWM
-        if not fan_model.rpm:
+        if not fan_model.pwm:
             r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.id)
             original_rpm = int(r.data)
         else:
             original_rpm = fan_model.rpm
-        original_pwm = fan_model.pwm or 20
+        original_pwm = fan_model.pwm if fan_model.pwm < MAX_FAN_PWM else MAX_FAN_PWM
         tty.command_write(JBODCommand.PWM, fan_model.controller_id, fan_model.id, MIN_FAN_PWM)
         # wait for rpm value to normalize
         r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.id)
