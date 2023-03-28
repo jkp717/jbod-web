@@ -1,17 +1,21 @@
 import os
 import math
+import sys
+
 import requests
 from typing import Optional, Iterable, Union
 from enum import IntEnum
 from dateutil import tz
-from flask import Markup, current_app, Flask
+from flask import Markup, current_app
 from flask_admin.helpers import url_for
 from datetime import datetime
 from flask_admin.model import typefmt
 from flask_admin.model.template import TemplateLinkRowAction
 
 from ipmi.models import db, FanSetpoint, SysConfig, Disk, Controller, Fan
-from ipmi.console import JBODRxData, JBODConsole, JBODCommand, JBODConsoleException
+from ipmi.console import JBODRxData, JBODConsole, JBODCommand, JBODConsoleException, ResetEvent
+
+from ipmi.config import MAX_FAN_PWM, MIN_FAN_PWM
 
 
 class StatusFlag(IntEnum):
@@ -27,7 +31,7 @@ def get_config_value(config_param: str):
         return db.session.query(SysConfig.value).where(SysConfig.key == config_param).first()[0]
 
 
-def truenas_api_request(method: str, url_path: str, headers: dict = None, data: dict = None):
+def truenas_api_request(method: str, url_path: str, headers: Optional[dict] = None, data: Optional[dict] = None):
     if headers is None:
         headers = {}
     with current_app.app_context():
@@ -52,7 +56,7 @@ def truenas_api_request(method: str, url_path: str, headers: dict = None, data: 
         return None
 
 
-def disk_tooltip_html(model: Union[Disk, None]) -> str:
+def disk_tooltip_html(model: Optional[Disk]) -> str:
     if model:
         return f"""<div class=disk-tooltip-temp>{model.temperature}</div>
         <a href="{url_for('disk.details_view', id=model.serial)}" class=disk-tooltip-item>{model.serial}</a>
@@ -86,7 +90,6 @@ def disk_size_formatter(view, context, model, name):
 
 def disk_link_formatter(view, context, model, name):
     filter_txt = 'flt0_physlot_chassis_name_equals'
-    print(getattr(model, name))
     if getattr(model, name):
         return Markup(
             f"""<a href='{url_for("disk.index_view")}?{filter_txt}={model.name}'>{getattr(model, name)}</a>"""
@@ -116,25 +119,28 @@ def psu_toggle_formatter(view, context, model, name):
         )
 
 
+def controller_id_formatter(view, context, model, name):
+    txt = 'Master' if model.id == 1 else f'Slave({model.id-1})'
+    return Markup(txt)
+
+
 class FanCalibrationRowAction(TemplateLinkRowAction):
     def __init__(self):
         super(FanCalibrationRowAction, self).__init__('custom_row_actions.fan_calibration')
 
 
-def get_model_by_id(model, id, column_name: str = 'id'):
+def get_model_by_id(model, id: Union[str, int], column_name: Optional[str] = 'id'):
     return db.session.query(model).where(getattr(model, column_name) == id).first()
 
 
 def cascade_add_setpoints(fan_id: int):
-    min_fan_pwm = int(get_config_value('min_fan_pwm'))
-    max_fan_pwm = int(get_config_value('max_fan_pwm'))
     min_chassis_temp = int(get_config_value('min_chassis_temp'))
     max_chassis_temp = int(get_config_value('max_chassis_temp'))
-    mid_fan_pwm = round((min_fan_pwm + max_fan_pwm) / 2)
+    mid_fan_pwm = round((int(MIN_FAN_PWM) + int(MAX_FAN_PWM)) / 2)
     mid_chassis_temp = round((min_chassis_temp + max_chassis_temp) / 2)
-    db.session.add(FanSetpoint(fan_id=fan_id, pwm=min_fan_pwm, temp=min_chassis_temp))
+    db.session.add(FanSetpoint(fan_id=fan_id, pwm=int(MIN_FAN_PWM), temp=min_chassis_temp))
     db.session.add(FanSetpoint(fan_id=fan_id, pwm=mid_fan_pwm, temp=mid_chassis_temp))
-    db.session.add(FanSetpoint(fan_id=fan_id, pwm=max_fan_pwm, temp=max_chassis_temp))
+    db.session.add(FanSetpoint(fan_id=fan_id, pwm=int(MAX_FAN_PWM), temp=max_chassis_temp))
 
 
 def get_config_formatters() -> dict:
@@ -187,9 +193,17 @@ def resolve_string_attr(obj: object, attr: str, level: int = None) -> Union[list
     return obj
 
 
-def truenas_callback(tty: JBODConsole, data: JBODRxData):
+def _test_callback(tty: JBODConsole, data: JBODRxData):
+    sys.stdout.write(f"test_callback triggered! Data Received: {data}\n")
+
+
+def console_callback(tty: JBODConsole, rx: JBODRxData):
+    """Update for non-truenas Hosts"""
     with current_app.app_context():
-        if data.xoff:
+        if current_app.config.get('TESTING'):
+            _test_callback(tty, rx)
+            return
+        if rx.xoff:
             current_app.logger.info("Shutdown request received from controller. "
                                     "Attempting to shutdown host now.")
             resp = truenas_api_request(
@@ -207,11 +221,38 @@ def truenas_callback(tty: JBODConsole, data: JBODRxData):
                         tty.command_write(JBODCommand.CANCEL_SHUTDOWN, controller.id)
                     except JBODConsoleException:
                         pass
-        elif data.xon:
-            current_app.logger.warning("ACPI ON Event received but host is already on! %s", data)
+        elif rx.xon:
+            current_app.logger.warning("ACPI ON Event received but host is already on! %s", rx)
+        elif rx.dc2:
+            # Device Control 2 used to broadcast rpm on all fans
+            # response example: {466-2038344B513050-19-1003:[1000,1200,0,3000]}
+            current_app.logger.debug("Attempting to parse rpm data: %s", rx)
+            try:
+                resp = str(rx.data).strip("{}")
+                c_id, arr_str = resp.split(":")[0], resp.split(":")[1]
+                for i, rpm in enumerate(arr_str.strip("[]").split(',')):
+                    fan = db.session.query(Fan).where(Fan.controller_uuid == c_id, Fan.port_num == i+1).first()
+                    if not fan:
+                        current_app.logger.warning("Unable to find associated fan for rpm data: %s", rx)
+                    else:
+                        # remove noise by only recording changes +/- 50 rpm
+                        if fan.rpm in range(int(rpm)-50, int(rpm)+50):
+                            fan.rpm = int(rpm)
+                            fan.rpm_deviation = fan_rpm_deviation(fan)
+                            db.session.commit()
+            except IndexError:
+                current_app.logger.error("Unable to parse rpm data from: %s", rx)
+        elif rx.dc4:
+            # misc controller event messages
+            resp = str(rx.data).strip("{}")
+            msg_type, msg_body = resp.split(":")[0], resp.split(":")[1]
+            if msg_type == 'reset_event':
+                rst_code = ResetEvent(int(msg_body)).name
+                current_app.logger.warning("Controller reset event: %s", rst_code)
+            else:
+                current_app.logger.warning("Unknown ds4 event message received: %s", rx)
         else:
-            # Uncaught event
-            current_app.logger.warning("Uncaught console event received: %s", data)
+            current_app.logger.warning("Uncaught console event received: %s", rx)
 
 
 def cascade_controller_fan(model: Controller, *args, **kwargs):
@@ -229,3 +270,30 @@ def cascade_controller_fan(model: Controller, *args, **kwargs):
         for row in del_rows:
             db.session.delete(row)
         db.session.commit()
+
+
+def fan_rpm_deviation(fan: Fan, pwm: Optional[int] = None) -> int:
+    """
+    Watchdog calculates expected RPM based on provided PWM.  Should be
+    ran each time rpm values are provided by controller.
+    @param fan: Fan Model
+    @param pwm: PWM to calculate (Model pwm used if not provided)
+    @return: Absolute RPM Deviation
+    """
+    # (pwm, rpm) = (x, y)
+    # TODO: Alert user of potential issues with fan
+    if fan.min_rpm and fan.max_rpm and fan.four_pin:
+        pwm = fan.pwm if not pwm else pwm
+        p1 = (int(MIN_FAN_PWM), fan.min_rpm)
+        p2 = (int(MAX_FAN_PWM), fan.max_rpm)
+        m = (p2[1] - p1[1]) / (p2[0] - p1[0])  # slope
+        y = p1[1] - m * p1[0]  # y-intercept
+        calc_rpm = (m * pwm) + y
+        return abs(fan.rpm - calc_rpm)
+    return 0
+
+
+# Fan Changes
+# rpm change -> active
+# poll setpoints -> boilerplate
+#

@@ -1,5 +1,11 @@
 
 
+# Max should not be 100, controller only supports two digits
+MAX_FAN_PWM = 99
+
+# Lowest supported value by most PWM fans
+MIN_FAN_PWM = 20
+
 # configuration defaults
 config_defaults = {
     'timezone': 'America/Chicago',
@@ -10,10 +16,7 @@ config_defaults = {
     'truenas_url': None,
     'max_chassis_temp': 65,
     'min_chassis_temp': 20,
-    'min_fan_pwm': 20,
-    'max_fan_pwm': 100,
-    'acpi_shutdown_script': None,
-    'acpi_startup_script': None
+    'rpm_watchdog_window': 200
 }
 
 # task scheduler defaults
@@ -40,7 +43,7 @@ scheduler_jobs = [
         'job_id': 'poll_fan_rpm',
         'func': 'ipmi.jobs:poll_fan_rpm',
         'job_name': 'Poll Fan RPMs',
-        'description': 'Poll controller to get latest fan RPM(s).',
+        'description': 'Poll controller(s) to get latest fan RPM.',
         'seconds': 30
     }, {
         'job_id': 'database_cleanup',

@@ -1,5 +1,6 @@
 import uuid
 
+import serial
 from flask import current_app, jsonify, request, redirect, flash, Markup
 from flask_admin import expose, BaseView
 from flask_admin.form import rules
@@ -75,9 +76,37 @@ class NewSetupView(BaseView):
             content = request.get_json(force=True)
             for k, v in content.items():
                 model = db.session.query(SysConfig).where(SysConfig.key == k).first()
+                # handle changes to serial port and baudrate
+                if k in ['console_port', 'baud_rate']:
+                    tty = get_console()
+                    if tty:
+                        if v is None:
+                            tty.close()
+                            model.value = None
+                        elif k == 'console_port':
+                            try:
+                                tty.change_port(v)
+                            except serial.SerialException:
+                                model.value = None
+                                db.session.commit()
+                                return jsonify({
+                                    "result": "error",
+                                    "msg": "Error occurred while attempting to change serial port. Please check"
+                                           "port provided is accessible to program."
+                                }), 400
+                        elif k == 'baud_rate':
+                            try:
+                                tty.change_baudrate(v)
+                            except serial.SerialException:
+                                model.value = None
+                                db.session.commit()
+                                return jsonify({
+                                    "result": "error",
+                                    "msg": "Error occurred while attempting to change serial baudrate"
+                                }), 400
                 model.value = v if not model.encrypt else current_app.encrypt(v.encode())
             db.session.commit()
-            return jsonify({"result": "success"}), 200
+            return jsonify({"result": "success", "msg": "Successfully established serial connection."}), 200
         if request.method == 'GET':
             # return a list of usable COM ports
             return jsonify({"avail_ports": [com.device for com in comports()]}), 200
@@ -110,8 +139,7 @@ class SysConfigView(JBODBaseView):
             tty = get_console()
             if tty:
                 if model.value is None:
-                    tty.close()
-                    current_app.__setattr__('console', None)
+                    tty.close()   # TODO: not sure if needed? Should test.
                 elif model.key == 'console_port':
                     tty.change_port(model.value)
                 elif model.key == 'baud_rate':
@@ -145,17 +173,11 @@ class FanView(JBODBaseView):
             return jsonify({'result': 'error', 'message': 'fan id required'}), 400
         # fan = fan_calibration(int(request.args.get('id')))
         # db.session.commit()
-        # calibration_job = {
-        #     "id": "fan_calibration",
-        #     "func": "ipmi.jobs:fan_calibration",
-        #     "args": (int(request.args.get('id')),),
-        #     "trigger": "date",  # triggers once on the given datetime (immediately if no run_date).
-        # }
         job_uuid = uuid.uuid4()
         calibration_job = {
             "id": str(job_uuid),
             "name": "fan_calibration",
-            "func": "ipmi.jobs:test_fan_job",
+            "func": "ipmi.jobs:fan_calibration",
             "replace_existing": True,
             "args": (fan_id,),
             "trigger": "date",  # triggers once on the given datetime (immediately if no run_date).
@@ -185,9 +207,14 @@ class FanView(JBODBaseView):
                 "message": "Warning: Calibration is taking longer than expected to complete."
             })
         if fan.calibration_status == helpers.StatusFlag.COMPLETE:
+            # add default setpoints to PWM Fans
+            if fan.four_pin:
+                helpers.cascade_add_setpoints(fan_id)
             return jsonify({
                 "status": helpers.StatusFlag.COMPLETE,
-                "message": "Fan calibration complete! Reload page to see results."
+                "message": Markup(f"""Fan calibration complete! 
+                    <a href="{self.get_url('.index_view')}" class="alert-link">Reload </a>to see results.
+            """)
             })
         if fan.calibration_status == helpers.StatusFlag.FAIL:
             return jsonify({
@@ -288,6 +315,7 @@ class DiskView(JBODBaseView):
     list_template = 'refresh_list.html'
     # column_editable_list = ['phy_slot']
     form_columns = ['phy_slot']
+    column_editable_list = ['phy_slot']
     column_filters = ['serial', 'bus', 'type', 'size', 'phy_slot.chassis.name', 'zfs_pool']
     column_list = [
         'serial', 'zfs_pool', 'model', 'size', 'type', 'bus', 'phy_slot', 'temperature',
@@ -297,7 +325,7 @@ class DiskView(JBODBaseView):
     # form_excluded_columns = JBODBaseView.form_excluded_columns + ['disk_temps', ]
 
     def get_empty_list_message(self):
-        return Markup(f"<a href={self.get_url('.refresh')}>Refresh Disks</a>")
+        return Markup(f"<a href={self.get_url('.refresh')}>Request disk data from Host</a>")
 
     @expose('/refresh')
     def refresh(self):
@@ -363,6 +391,8 @@ class ControllerView(JBODBaseView):
     can_edit = False
     refresh_view = '.ping'
     list_template = 'refresh_list.html'
+    column_list = ['id', 'mcu_device_id', 'firmware_version', 'fan_port_cnt', 'psu_on', 'alive']
+    column_formatters = {'id': helpers.controller_id_formatter}
 
     def get_empty_list_message(self):
         return Markup(f"<a href={self.get_url('.ping')}>Search for connected Controllers</a>")

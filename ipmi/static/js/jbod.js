@@ -112,6 +112,10 @@ function updateStatusIcon(options) {
         iconDiv.querySelector('i').className = 'fa fa-solid fa-arrow-circle-up';
         $(iconDiv).addClass('disconnected');
         break;
+      case 'ERROR':
+        iconDiv.querySelector('i').className = 'fa fa-solid fa-question-circle';
+        $(iconDiv).addClass('disconnected');
+        break;
       default:
         iconDiv.querySelector('i').className = 'fa fa-solid fa-link-slash';
         $(iconDiv).addClass('disconnected');
@@ -120,6 +124,8 @@ function updateStatusIcon(options) {
     if (popoverDiv.find(".popover-content-attr").hasClass('disconnected')) {
         popoverDiv.addClass("navbar-popover-alert");
     }
+
+
     iconDiv.querySelector('i').title = statusMsg;
     // Destroy and then recreate popover with new content
     popoverDiv.find('a').popover('dispose');
@@ -134,23 +140,40 @@ function updateStatusIcon(options) {
 */
 function modalFormHandler(formElementId, formUrl) {
   function sendData(data) {
-    const XHR = new XMLHttpRequest();
+    const modalXHR = new XMLHttpRequest();
     // Define what happens on successful data submission
-    XHR.addEventListener("load", (event) => {
+    modalXHR.addEventListener("load", (event) => {
       form.reset();
       var modalIdSelector = "#" + formElementId.replace('-form','-modal');
       $(modalIdSelector).modal('hide');
-      document.querySelector('a[data-target="' + modalIdSelector + '"] > span').className = "fa fa-solid fa-check-circle";
+      let resp = JSON.parse(modalXHR.responseText);
+      if (resp['result'] == 'success') {
+        document.querySelector('a[data-target="' + modalIdSelector + '"] > span').className = "fa fa-solid fa-check-circle";
+        createAlertElements("success", resp["msg"]);
+        updateStatusIcon({
+            statusMsg: "READY",
+            popoverDiv: $('#connStatusPopover'),
+            iconDiv: document.getElementById("controllerConnStatus")
+        });
+      } else {
+        document.querySelector('a[data-target="' + modalIdSelector + '"] > span').className = "fa fa-solid fa-question-circle";
+        createAlertElements("danger", resp["msg"]);
+        updateStatusIcon({
+            statusMsg: resp['result'].toUpperCase(),
+            popoverDiv: $('#connStatusPopover'),
+            iconDiv: document.getElementById("controllerConnStatus")
+        });
+      }
     });
     // Define what happens in case of error
-    XHR.addEventListener("error", (event) => {
+    modalXHR.addEventListener("error", (event) => {
       alert('Oops! Something went wrong.');
     });
     // Set up our request
-    XHR.open("POST", formUrl);
+    modalXHR.open("POST", formUrl);
     // The data sent is what the user provided in the form
-    XHR.setRequestHeader("Content-Type", 'application/json');
-    XHR.send(JSON.stringify(data));
+    modalXHR.setRequestHeader("Content-Type", 'application/json');
+    modalXHR.send(JSON.stringify(data));
   }
   // Get the form element
   const form = document.getElementById(formElementId);
@@ -170,37 +193,40 @@ function modalFormHandler(formElementId, formUrl) {
 
 function fanCalibrationHandler(requestURL, fanId) {
     // Confirmation window
-    faHelpers.safeConfirm('Start fan calibration?');
-    const progressBar = $('.calibration-progress-modal[data-fan="' + fanId + '"]').find( ".progress-bar" );
-    const XHR = new XMLHttpRequest();
-    // Define what happens on successful data submission
-    XHR.addEventListener("load", (event) => {
-      if (XHR.status == 200) {
-        let jobId = JSON.parse(XHR.responseText)['job']['id'];
-        $('.calibration-progress-modal[data-fan="' + fanId + '"]').modal('show');
-        console.log("width of parent " + progressBar.parent().width());
-        console.log("starting width of " + Math.round(progressBar.parent().width() * 0.3) + "px");
-        progressBar.animate(
-            {
-              width: Math.round(progressBar.parent().width() * 0.3) + "px"
-            },{
-              queue: false,
-              duration: 3000,
-              easing: 'linear',
-              complete: function() {
-                checkCalibrationStatus(fanId);
-              }
-            }
-        );
-      }
-    });
-    // Define what happens in case of error
-    XHR.addEventListener("error", (event) => {
-      console.log("error processing request");
-    });
-    // Set up our request
-    XHR.open("GET", requestURL);
-    XHR.send();
+    if (confirm("Start fan calibration?")) {
+        const progressBar = $('.calibration-progress-modal[data-fan="' + fanId + '"]').find( ".progress-bar" );
+        const XHR = new XMLHttpRequest();
+        // Define what happens on successful data submission
+        XHR.addEventListener("load", (event) => {
+          if (XHR.status == 200) {
+            let jobId = JSON.parse(XHR.responseText)['job']['id'];
+            $('.calibration-progress-modal[data-fan="' + fanId + '"]').modal('show');
+            console.log("width of parent " + progressBar.parent().width());
+            console.log("starting width of " + Math.round(progressBar.parent().width() * 0.3) + "px");
+            progressBar.animate(
+                {
+                  width: Math.round(progressBar.parent().width() * 0.3) + "px"
+                },{
+                  queue: false,
+                  duration: 3000,
+                  easing: 'linear',
+                  complete: function() {
+                    checkCalibrationStatus(fanId);
+                  }
+                }
+            );
+          }
+        });
+        // Define what happens in case of error
+        XHR.addEventListener("error", (event) => {
+          console.log("error processing request");
+        });
+        // Set up our request
+        XHR.open("GET", requestURL);
+        XHR.send();
+    } else {
+        console.log("Calibration job cancelled.");
+    }
 }
 
 var cntAttempts = 0;
@@ -284,7 +310,7 @@ function createAlertElements(alertType, message) {
     div.setAttribute("role", "alert");
 
     const msgSpan = document.createElement("span");
-    msgSpan.innerText = message;
+    msgSpan.innerHTML = message;
 
     const btn = document.createElement("button");
     btn.className = "close";

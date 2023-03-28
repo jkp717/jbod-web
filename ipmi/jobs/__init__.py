@@ -1,4 +1,3 @@
-import requests
 import time
 from typing import Optional, Union
 from flask import current_app
@@ -10,6 +9,7 @@ from ipmi.console import JBODCommand, \
     JBODRxData, JBODConsole, JBODConsoleException
 from ipmi import helpers
 from ipmi.jobs import events as ev
+from ipmi.config import MIN_FAN_PWM, MAX_FAN_PWM
 
 
 scheduler = APScheduler()
@@ -18,14 +18,19 @@ scheduler = APScheduler()
 def get_console() -> Union[JBODConsole, None]:
     with current_app.app_context():
         if not getattr(current_app, 'console', None):
+            port = helpers.get_config_value('console_port')
+            if not port:
+                # set console to None if port is not provided
+                current_app.__setattr__('console', None)
+                return None
             try:
                 tty = JBODConsole(
                     serial_for_url(
-                        helpers.get_config_value('console_port'),
+                        port,
                         baudrate=int(helpers.get_config_value('baud_rate')),
                         timeout=int(helpers.get_config_value('console_timeout')),
                         do_not_open=True),
-                    callback=helpers.truenas_callback
+                    callback=helpers.console_callback
                 )
                 tty.start()
                 current_app.__setattr__('console', tty)
@@ -39,7 +44,7 @@ def get_console() -> Union[JBODConsole, None]:
 def console_connection_check():
     tty = get_console()
     if tty is not None:
-        return tty.alive
+        return tty.serial.is_open
     return False
 
 
@@ -124,7 +129,6 @@ def _query_zfs_properties() -> dict:
                 disk_props = {}
                 # topology.data.0.children.0.type
                 disk = helpers.resolve_string_attr(pool, path)  # returns disk object
-                print(disk)
                 disk_props['zfs_pool'] = pool['name']
                 disk_props['zfs_topology'] = path.split('.')[1]
                 disk_props['zfs_device_path'] = disk['path']
@@ -143,38 +147,6 @@ def query_host_state() -> str:
     if resp:
         return resp.text
     return 'UNKNOWN'
-
-
-def console_rx_callback(response: JBODRxData):
-    """
-    Called by JBODConsole read thread when read data
-    was not picked up by another request.
-    @param response: JBODRxData object
-    @return: None
-    """
-    print("Hello from the callback ")
-    # if response.xoff:
-    #     with current_app.app_context():
-    #         current_app.logger.info(
-    #             "Shutdown request received from controller. Attempting to shutdown host now."
-    #         )
-    #         tty = get_console()
-    #         resp = _truenas_api_request(
-    #             'POST',
-    #             '/api/v2.0/system/shutdown',
-    #             headers={'Content-Type': 'application/json'},
-    #             data={"delay": 0}
-    #         )
-    #         if resp.status_code == 200:
-    #             tty.command_write(JBODControlCharacter.ACK)
-    #             current_app.logger.info(
-    #                 "Shutdown request received by host."
-    #             )
-    #         else:
-    #             tty.command_write(JBODControlCharacter.ACK)
-    #             current_app.logger.error(
-    #                 "Shutdown request rejected by host."
-    #             )
 
 
 def poll_setpoints() -> None:
@@ -234,54 +206,11 @@ def poll_setpoints() -> None:
                     scheduler.app.logger.debug("Fan %s setpoint is correct; no changes made", fan.fan_id)
 
 
-def poll_fan_rpm() -> None:
-    """
-    Polls controller for fan RPMs. Writes any changes to database.
-    """
-    with scheduler.app.app_context():
-        tty = get_console()
-        if not tty:
-            raise SerialException("Serial connection not established.")
-        controllers = db.session.query(Controller).all()  # noqa
-        for controller in controllers:
-            # send each fan to controller to get rpm values
-            fans = db.session.query(Fan).where(Fan.controller_id == controller.id).all()
-            if not fans:
-                continue
-            for fan in fans:
-                # Keep current rpm for reference later
-                _old_rpm = fan.rpm
-                resp = tty.command_write(JBODCommand.RPM, controller.id, fan.id)
-                fan.rpm = int(resp.data)
-                # Log large changes
-                if abs(fan.rpm - _old_rpm) > 100:
-                    scheduler.app.logger.info("RPM Change: FAN %s RPM %s", fan.fan_id, fan.rpm)
-                else:
-                    scheduler.app.logger.debug("No change to RPM Values on Fan: %s", fan.fan_id)
-                db.session.commit()
-        scheduler.app.logger.debug("task poll_fan_rpm completed")
-
-
-def _controller_property_mapper(data: str) -> dict:
-    """converts DEVICE_ID command response to dict"""
-    props = {}
-    dev_id_map = {
-        'id': 'mcu_device_id',
-        'lot': 'mcu_lot_id',
-        'waf': 'mcu_wafer_id',
-        'rev': 'mcu_revision_id'
-    }
-    # assign model attrs based on mapper
-    for id_type in data.strip().strip("{}").split(","):
-        props[dev_id_map.get(id_type.split(':')[0])] = id_type.split(':')[1]
-    return props
-
-
 def ping_controllers(controller_id: Optional[int] = None) -> Union[list[dict], list[None]]:
     """
     Loop increments id calling DEVICE_ID command until either NAK or no response
     @param controller_id: will only ping this controller if provided
-    @return: list of device properties from responses
+    @return: list of responding device ids
     """
     with current_app.app_context():
         resp = []
@@ -291,7 +220,7 @@ def ping_controllers(controller_id: Optional[int] = None) -> Union[list[dict], l
             # continue to loop until either NAK or no response
             try:
                 dev_id = tty.command_write(JBODCommand.DEVICE_ID, next_id)
-                resp.append({"id": next_id, **_controller_property_mapper(str(dev_id.data))})
+                resp.append({"id": next_id, "mcu_device_id": str(dev_id.data)})
             except JBODConsoleException:
                 break
             if next_id == controller_id:
@@ -308,8 +237,7 @@ def query_controller_properties(controller: Controller) -> Controller:
         try:
             # returns a json like object with id, lot, waf, rev properties
             dev_id = tty.command_write(JBODCommand.DEVICE_ID, controller.id)
-            for k, v in _controller_property_mapper(str(dev_id.data)).items():
-                setattr(controller, k, v)
+            controller.mcu_device_id = str(dev_id.data)
 
             # get total fan ports supported by controller
             fc = tty.command_write(JBODCommand.FAN_CNT, controller.id)
@@ -321,7 +249,6 @@ def query_controller_properties(controller: Controller) -> Controller:
 
             # get PSU status
             psu = tty.command_write(JBODCommand.STATUS, controller.id)
-            print('psu', psu)
             controller.psu_on = psu.data == 'ON'
 
             controller.alive = True
@@ -337,6 +264,22 @@ def database_cleanup():
             text("""DELETE FROM disk_temp WHERE create_date < now() - INTERVAL 2 DAY;""")
         )
         db.session.commit()
+
+
+def poll_fan_rpm() -> None:
+    """
+    Job sends a non-blocking rpm request to controller through
+    the console write thread.  Responses are handled by the console
+    callback (ds2 messages).
+    """
+    with scheduler.app.app_context():
+        with scheduler.app.app_context():
+            tty = get_console()
+            if not tty.serial.is_open:
+                raise SerialException("Serial connection not established.")
+            # controller responds to DC2 requests with json-like object
+            # with mcu_id as key and list of fan's rpm as value
+            tty.transmit(tty.ctrlc.DC2)
 
 
 def fan_calibration(fan_id: int) -> None:
@@ -355,8 +298,13 @@ def fan_calibration(fan_id: int) -> None:
         fan_model = helpers.get_model_by_id(Fan, fan_id)
         # pwm fan‘s speed scales broadly linear with the duty-cycle of the PWM signal between
         # maximum speed at 100% PWM and the specified minimum speed at 20% PWM
+        if not fan_model.rpm:
+            r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.id)
+            original_rpm = int(r.data)
+        else:
+            original_rpm = fan_model.rpm
         original_pwm = fan_model.pwm or 20
-        tty.command_write(JBODCommand.PWM, fan_model.controller_id, fan_model.id, 20)
+        tty.command_write(JBODCommand.PWM, fan_model.controller_id, fan_model.id, MIN_FAN_PWM)
         # wait for rpm value to normalize
         r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.id)
         new_rpm = int(r.data)
@@ -370,7 +318,7 @@ def fan_calibration(fan_id: int) -> None:
         # store new readings in min_rpm; round to the nearest 100th
         fan_model.min_rpm = round(new_rpm, -2)
         # Set fan to max PWM
-        tty.command_write(JBODCommand.PWM, fan_model.controller_id, fan_model.id, 20)
+        tty.command_write(JBODCommand.PWM, fan_model.controller_id, fan_model.id, MAX_FAN_PWM)
         # wait for rpm value to normalize
         time.sleep(0.5)
         r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.id)
@@ -382,8 +330,14 @@ def fan_calibration(fan_id: int) -> None:
             new_rpm = int(tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.id).data)
             wait_secs += 1
         fan_model.max_rpm = round(new_rpm, -2)
+        # define four pin
+        if fan_model.min_rpm in range(fan_model.max_rpm-100, fan_model.max_rpm+100):
+            fan_model.four_pin = False
+        else:
+            fan_model.four_pin = True
         # Set fan back to original PWM
         tty.command_write(JBODCommand.PWM, fan_model.controller_id, fan_model.id, original_pwm)
+        fan_model.rpm = original_rpm
         # commit changes to db
         db.session.commit()
 

@@ -3,6 +3,7 @@ import serial
 from typing import Optional, Union
 import time
 from enum import Enum
+import re
 
 
 class JBODConsoleException(Exception):
@@ -38,6 +39,17 @@ class JBODConsoleAckException(JBODConsoleException):
         super().__init__(self.message)
 
 
+class ResetEvent(Enum):
+    UNKNOWN_RESET = 0
+    LOW_POWER_RESET = 1
+    WINDOW_WATCHDOG_RESET = 2
+    INDEPENDENT_WATCHDOG_RESET = 3
+    SOFTWARE_RESET = 4
+    POWER_ON_POWER_DOWN_RESET = 5
+    EXTERNAL_PIN_RESET = 6
+    BROWNOUT_RESET = 7
+
+
 class JBODCommand(Enum):
     """
     Defined jbod controller commands
@@ -67,6 +79,8 @@ class JBODControlCharacter(Enum):
     NAK = "\x15"   # Negative Ack
     XOFF = "\x13"  # Device Control (XOFF)
     XON = "\x11"  # Device Control (XON)
+    DC2 = "\x12"  # Device Control 2
+    DC4 = "\x14"  # Device Control 4
 
 
 class JBODRxData:
@@ -77,6 +91,8 @@ class JBODRxData:
         self._ack = False
         self._xon = False
         self._xoff = False
+        self._dc2 = False
+        self._dc4 = False
         self._data = None
         # ACK & NAK ascii character as bytes
         self._ackc = str(JBODControlCharacter.ACK.value).encode(self.ENCODING)
@@ -84,6 +100,9 @@ class JBODRxData:
         # XON & XOFF ascii character as bytes
         self._xonc = str(JBODControlCharacter.XON.value).encode(self.ENCODING)
         self._xoffc = str(JBODControlCharacter.XOFF.value).encode(self.ENCODING)
+        # Device Control
+        self._dc2c = str(JBODControlCharacter.DC2.value).encode(self.ENCODING)
+        self._dc4c = str(JBODControlCharacter.DC4.value).encode(self.ENCODING)
 
         self._parse_data(data)
 
@@ -116,12 +135,28 @@ class JBODRxData:
         self._xoff = (self._xoffc == val)
 
     @property
+    def dc2(self):
+        return self._dc2
+
+    @dc2.setter
+    def dc2(self, val: bytes):
+        self._dc2 = (self._dc2c == val)
+
+    @property
+    def dc4(self):
+        return self._dc2
+
+    @dc4.setter
+    def dc4(self, val: bytes):
+        self._dc4 = (self._dc4c == val)
+
+    @property
     def data(self):
         return self._data
 
     def _parse_data(self, data: bytes):
         d = tuple(filter(None, data.decode(self.ENCODING).strip('\r\n').split('\x00')))
-        for prop in ['ack', 'xon', 'xoff']:
+        for prop in ['ack', 'xon', 'xoff', 'dc2', 'dc4']:
             self.__setattr__(prop, d[0].encode(self.ENCODING))
         try:
             # self._data = d[1].encode(self.ENCODING)
@@ -130,7 +165,8 @@ class JBODRxData:
             self._data = None
 
     def __repr__(self):
-        return f"JBODRxData(ack={self.ack},xon={self.xon},xoff={self.xoff},data={self.data},raw_data={self.raw_data})"
+        return f"JBODRxData(ack={self.ack},xon={self.xon},xoff={self.xoff},dc2={self.dc2},dc4={self.dc4}" \
+               f"data={self.data},raw_data={self.raw_data})"
 
 
 class JBODConsole:
@@ -138,7 +174,7 @@ class JBODConsole:
     ENCODING = 'ASCII'
     NEW_RX_DATA = False
     NEW_TX_DATA = False
-    DEBUG = True
+    TESTING = False
 
     def __init__(self, serial_instance: serial.Serial, callback: Optional[callable] = None):
         self.cmd = JBODCommand
@@ -209,7 +245,6 @@ class JBODConsole:
                         self.rx_buffer = bytes(self._data_received)
                         # reset bytearray
                         self._data_received = bytearray()
-                        print("Data received and ready to read!")
                         retries = 0
                         # give time to process rx data (1 sec max)
                         while retries < 10 and self.NEW_RX_DATA:
@@ -230,13 +265,16 @@ class JBODConsole:
             while self.alive:
                 if self.NEW_TX_DATA:
                     with self._lock:
-                        print(f"writing from writer thread {self.tx_buffer}")
                         self.serial.write(self.tx_buffer)
-                        self.tx_buffer = None  # clear buffer once transmitted
+                    self.tx_buffer = None  # clear buffer once transmitted
                 time.sleep(0.01)
         except Exception as err:
             self.alive = False
             raise err
+
+    @staticmethod
+    def _command_match(pattern: re.Pattern, comparison):
+        return re.match(pattern, comparison)
 
     @staticmethod
     def _command_format(command: JBODCommand, cmd_vars=None):
@@ -259,9 +297,13 @@ class JBODConsole:
             fmt_command = command.value
         b = bytearray(str(fmt_command), self.ENCODING)  # convert str to bytearray
         b.extend(self.TERMINATOR)  # add terminator to end of bytearray
-        if self.DEBUG:
+        if self.TESTING:
             if bytes(b) in ack_tests.keys():
                 b = ack_tests[bytes(b)]
+            else:
+                for k, v in ack_tests.items():
+                    if isinstance(k, re.Pattern):
+                        b = v if self._command_match(k, bytes(b).decode('ASCII')) else b
         self.serial.write(bytes(b))  # convert bytearray to bytes
         resp = JBODRxData(self.receive_now())
         if not resp.ack:
@@ -331,9 +373,16 @@ class JBODConsole:
     def callback(self, func: callable):
         self._callback = func
 
-    def transmit(self, data: bytes):
-        # sets NEW_TX_DATA flag when set
-        self.tx_buffer = data
+    def transmit(self, data: Union[bytes, JBODControlCharacter]) -> None:
+        """
+        Non-blocking thread-safe write. Responses should be
+        handled by callback.
+        """
+        # Handle JBODCommands too?
+        if isinstance(data, JBODControlCharacter):
+            self.tx_buffer = data.value.encode(self.ENCODING)
+        else:
+            self.tx_buffer = data
 
     def change_baudrate(self, baudrate: int):
         """Change baudrate after initialized"""
@@ -345,28 +394,32 @@ class JBODConsole:
 
     def change_port(self, port: str):
         """Change port after initialized"""
-        if port != self.serial.port:
+        if port and port != self.serial.port:
             # reader thread needs to be shut down
             self._stop_reader()
             # save settings
             settings = self.serial.getSettingsDict()
-            new_serial = serial.serial_for_url(port, do_not_open=True)
-            # restore settings and open
-            new_serial.applySettingsDict(settings)
-            self.serial.close()
-            self.serial = new_serial
             try:
+                new_serial = serial.serial_for_url(port, do_not_open=True)
+                # restore settings and open
+                new_serial.applySettingsDict(settings)
                 new_serial.open()
             except serial.SerialException as e:
-                self.close()
+                self.serial.close()
+                self.stop()
                 raise e
-            # and restart the reader thread
-            self._start_reader()
+            else:
+                self.serial.close()
+                self.serial = new_serial
+                # self.start() # already started, no need to (re)start
 
 
 ack_tests = {
-    "jbod/1 id\r\n".encode("ASCII"): "\x06\x00{id:0x466,lot:0x2038344B513050,waf:0x19,rev:0x1003}\x00\r\n".encode('ASCII'),
-    "jbod/2 id\r\n".encode("ASCII"): "\x06\x00{id:0x467,lot:0x2038344B516054,waf:0x20,rev:0x1004}\x00\r\n".encode('ASCII'),
+    re.compile(r"jbod/1 pwm fan/\d \d{2}"): "\x06\x00\r\n".encode('ASCII'),
+    re.compile(r"jbod/2 pwm \d{2}"): "\x06\x00\r\n".encode('ASCII'),
+    "\x12".encode("ASCII"): "\x12\x00{466-2038344B513050-19-1003:[1100,2000,1900,2000]}\x00\r\n\x12\x00{466-2038344B513040-20-1004:[1200,2300,2200,0]}\x00\r\n".encode('ASCII'),
+    "jbod/1 id\r\n".encode("ASCII"): "\x06\x00466-2038344B513050-19-1003\x00\r\n".encode('ASCII'),
+    "jbod/2 id\r\n".encode("ASCII"): "\x06\x00466-2038344B513040-20-1004\x00\r\n".encode('ASCII'),
     "jbod/1 fans\r\n".encode("ASCII"): "\x06\x004\x00\r\n".encode("ASCII"),
     "jbod/2 fans\r\n".encode("ASCII"): "\x06\x004\x00\r\n".encode("ASCII"),
     "jbod/1 version\r\n".encode("ASCII"): "\x06\x00v2.0.0\x00\r\n".encode("ASCII"),

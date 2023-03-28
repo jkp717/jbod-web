@@ -83,7 +83,6 @@ def create_app(test_config=None):
 
     # initialize flask addons
     db.init_app(app)
-    jobs.scheduler.init_app(app)
 
     with app.app_context():
         # Create the database if it doesn't already exist
@@ -119,6 +118,7 @@ def create_app(test_config=None):
         # setup console threads for read/writes
         jobs.get_console()
 
+    jobs.scheduler.init_app(app)
     app = setup_flask_admin(app, db.session)
 
     # setup apscheduler and event listeners

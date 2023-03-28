@@ -195,6 +195,16 @@
     font-weight: 500;
 }
 
+div.editable-input > .select2-container {
+/* fix for flask admin too small selection window */
+    min-width: 200px;
+}
+
+div.editable-input > .select2-container-active .select2-choice {
+/* fix for flask admin too small selection window */
+    min-width: 200px;
+}
+
 .card-text .support-text {
     font-size: 13px;
     opacity: 0.5;

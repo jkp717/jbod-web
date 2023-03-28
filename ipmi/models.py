@@ -83,12 +83,12 @@ class Disk(db.Model):
     bus = db.Column(db.String)  # SCSI, SATA, etc...
     zfs_pool = db.Column(db.String)  # zfs pool name
     zfs_topology = db.Column(db.String)  # [data,log,cache,spare,special,dedup]
-    zfs_device_path = db.Column(db.String)
+    zfs_device_path = db.Column(db.String, unique=True)
     read_errors = db.Column(db.Integer, default=0)
     write_errors = db.Column(db.Integer, default=0)
     checksum_errors = db.Column(db.Integer, default=0)
     # End of columns retrieved from TrueNAS
-    phy_slot_id = db.Column(db.Integer, db.ForeignKey("phy_slot.id"))
+    phy_slot_id = db.Column(db.Integer, db.ForeignKey("phy_slot.id"), unique=True)
     create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
     disk_temps = db.relationship('DiskTemp', back_populates='disk')
@@ -152,7 +152,7 @@ class Chassis(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, unique=True)
     slot_cnt = db.Column(db.Integer, nullable=False)
-    controller_id = db.Column(db.Integer, db.ForeignKey("controller.id"))
+    controller_id = db.Column(db.Integer, db.ForeignKey("controller.id"), unique=True)
     phy_slots = db.relationship('PhySlot', back_populates='chassis', cascade="all, delete-orphan")
     controller = db.relationship('Controller', back_populates='chassis', uselist=False)
     create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
@@ -196,6 +196,7 @@ class Chassis(db.Model):
     def active_fans(self):
         if self.fans:
             return sum([fan.active for fan in self.fans])
+        return []
 
     @active_fans.expression
     def active_fans(cls):
@@ -246,16 +247,13 @@ class PhySlot(db.Model):
         return self.create_date
 
     def __repr__(self):
-        return f"chassis={self.chassis} | slot={self.phy_slot}"
+        return f"{self.chassis} | slot:{self.phy_slot}"
 
 
 class Controller(db.Model):
     __tablename__ = "controller"
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer)
     mcu_device_id = db.Column(db.String)
-    mcu_lot_id = db.Column(db.String)
-    mcu_wafer_id = db.Column(db.String)
-    mcu_revision_id = db.Column(db.String)
     firmware_version = db.Column(db.String)
     fan_port_cnt = db.Column(db.Integer)
     psu_on = db.Column(db.Boolean, default=False)
@@ -265,12 +263,7 @@ class Controller(db.Model):
     create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
     __table_args__ = (
-        db.UniqueConstraint(
-            'mcu_device_id',
-            'mcu_lot_id',
-            'mcu_wafer_id',
-            'mcu_revision_id',
-            name='controller_device_id_uc'),
+        db.PrimaryKeyConstraint(id, mcu_device_id),
     )
 
     @hybrid_property
@@ -281,11 +274,10 @@ class Controller(db.Model):
 
     @hybrid_property
     def uuid(self):
-        return f"{self.mcu_device_id}-{self.mcu_lot_id}-{self.mcu_wafer_id}-{self.mcu_revision_id}"
+        return str(self.mcu_device_id)
 
     def __repr__(self):
-        return f"Controller(id={self.id}, " \
-               f"mcu={self.mcu_device_id}-{self.mcu_lot_id}-{self.mcu_wafer_id}-{self.mcu_revision_id})"
+        return f"Controller(id={self.id},mcu={self.mcu_device_id})"
 
 
 class Fan(db.Model):
@@ -297,6 +289,7 @@ class Fan(db.Model):
     rpm = db.Column(db.Integer, default=0)
     max_rpm = db.Column(db.Integer)
     min_rpm = db.Column(db.Integer)
+    rpm_deviation = db.Column(db.Integer)
     four_pin = db.Column(db.Boolean, default=False)
     active = db.Column(db.Boolean, default=False)
     calibration_job_uuid = db.Column(db.String)
@@ -307,6 +300,12 @@ class Fan(db.Model):
     modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
 
     @hybrid_property
+    def controller_uuid(self):
+        if self.controller:
+            return self.controller.mcu_device_id
+        return None
+
+    @hybrid_property
     def last_update(self):
         if self.modify_date:
             return self.modify_date
@@ -314,6 +313,16 @@ class Fan(db.Model):
 
     def __repr__(self):
         return f"Fan ID: {self.id}"
+
+
+# trigger used to manage 'active' column
+update_fan_active_trigger = db.DDL("""\
+CREATE TRIGGER update_fan_active_tr UPDATE OF rpm ON fan
+  BEGIN
+    UPDATE fan SET active = CASE WHEN NEW.rpm > 0 THEN 1 ELSE 0 END
+    WHERE id = NEW.id;
+  END;""")
+db.event.listen(Fan.__table__, 'after_create', update_fan_active_trigger)
 
 
 class FanSetpoint(db.Model):
