@@ -9,7 +9,7 @@ MIN_FAN_PWM = 20
 # configuration defaults
 config_defaults = {
     'timezone': 'America/Chicago',
-    'console_port': '/dev/ttyS0',
+    'console_port': None,
     'baud_rate': '115600',
     'console_timeout': 1,
     'truenas_api_key': None,
@@ -53,3 +53,23 @@ scheduler_jobs = [
         'hours': 2
     },
 ]
+
+logging_config = {
+    'version': 1,
+    'formatters': {
+        'default': {
+            'format': '[%(asctime)s] %(levelname)s in %(module)s: %(message)s',
+        }
+    },
+    'handlers': {
+        'wsgi': {
+            'class': 'logging.StreamHandler',
+            'stream': 'ext://flask.logging.wsgi_errors_stream',
+            'formatter': 'default'
+        }
+    },
+    'root': {
+        'level': 'DEBUG',
+        'handlers': ['wsgi']
+    }
+}

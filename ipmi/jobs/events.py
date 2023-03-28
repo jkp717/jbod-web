@@ -1,11 +1,9 @@
 import logging
-from flask.logging import default_handler
 from ipmi import helpers, jobs
 from ipmi.models import db, Fan
 
 
 _logger = logging.getLogger(__name__)
-_logger.addHandler(default_handler)
 
 
 def fan_calibration_job_listener(event):

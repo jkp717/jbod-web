@@ -1,6 +1,7 @@
 import os
 import base64
 from flask import Flask
+from logging.config import dictConfig
 from sqlalchemy.exc import IntegrityError
 from flask_admin import Admin
 from cryptography.fernet import Fernet
@@ -9,7 +10,10 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from apscheduler.events import EVENT_JOB_MISSED, EVENT_JOB_ERROR, EVENT_JOB_EXECUTED, EVENT_JOB_ADDED, \
     EVENT_JOB_REMOVED, EVENT_JOB_SUBMITTED
 
-from ipmi.config import config_defaults, scheduler_jobs
+from ipmi.config import config_defaults, scheduler_jobs, logging_config
+
+
+dictConfig(logging_config)
 
 
 def setup_flask_admin(app_instance, session):

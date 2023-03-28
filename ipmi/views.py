@@ -67,8 +67,8 @@ class NewSetupView(BaseView):
                 model = db.session.query(SysConfig).where(SysConfig.key == k).first()
                 model.value = v if not model.encrypt else current_app.encrypt(v.encode())
             db.session.commit()
-            return jsonify({"result": "success"}), 200
-        return jsonify({"result": "method not allowed"}), 405
+            return jsonify({"result": "success", "msg": "Connection successful."}), 200
+        return jsonify({"result": "error", "msg": "method not allowed"}), 405
 
     @expose('/controller', methods=['GET', 'POST'])
     def controller(self):
@@ -160,7 +160,7 @@ class FanView(JBODBaseView):
     ]
     form_excluded_columns = JBODBaseView.form_excluded_columns + [
         'setpoints', 'rpm', 'active', 'four_pin', 'port_num', 'controller', 'min_rpm', 'max_rpm',
-        'calibration_job_uuid', 'calibration_status', 'pwm'
+        'calibration_job_uuid', 'calibration_status', 'pwm', 'rpm_deviation'
     ]
     form_rules = [rules.Header('Fan Setpoints')]
     column_filters = ['controller.id', 'controller.chassis', 'controller.chassis.id', 'rpm', 'active']

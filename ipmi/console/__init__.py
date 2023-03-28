@@ -189,10 +189,7 @@ class JBODConsole:
         self._callback = callback
         self._data_received = bytearray()
         self._lock = threading.Lock()
-        if kwargs.get('cxt'):
-            self.cxt = kwargs.get('cxt')
-        else:
-            self.cxt = None
+        self._callback_kwargs = kwargs
 
     def _start_reader(self):
         """Start reader thread"""
@@ -259,7 +256,7 @@ class JBODConsole:
                         # passing to callback if data has not been processed
                         if self._callback and self.NEW_RX_DATA:
                             # will clear NEW_RX_DATA flag
-                            self._callback(self, JBODRxData(bytes(self.rx_buffer)), cxt=self.cxt)
+                            self._callback(self, JBODRxData(bytes(self.rx_buffer)), **self._callback_kwargs)
                 time.sleep(0.01)
         except serial.SerialException as err:
             self.alive = False
