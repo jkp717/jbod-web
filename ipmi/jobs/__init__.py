@@ -348,6 +348,17 @@ def fan_calibration(fan_id: int) -> None:
         db.session.commit()
 
 
+def sound_controller_alarm(controller_id: int, duration: int = 3) -> None:
+    with scheduler.app.app_context():
+        tty = get_console()
+        if not tty:
+            raise SerialException("Serial connection not established.")
+        # 50 is the recommended duty cycle for piezo buzzer used
+        tty.command_write(JBODCommand.ALARM, controller_id, '50')
+        time.sleep(duration)
+        tty.command_write(JBODCommand.ALARM, controller_id, '00')
+
+
 def test_serial_job() -> None:
     with current_app.app_context():
         print("writing test started")

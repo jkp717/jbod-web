@@ -26,3 +26,11 @@
   </div>
 </div>
 {% endmacro %}
+
+{% macro controller_alarm(action, row_id, row) %}
+<a class="icon" title="{{ _gettext('Test Alarm') }}" href="{{ get_url('.alarm', controller_id=row.id) }}">
+  <i class="mdl-sound">
+    {{ svg_html_converter(url_for('static', filename='icons/volume-high.svg')) }}
+  </i>
+</a>
+{% endmacro %}

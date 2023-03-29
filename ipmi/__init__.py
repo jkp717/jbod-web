@@ -2,7 +2,7 @@ import logging
 import os
 import base64
 from flask import Flask
-from logging.config import dictConfig
+from logging.handlers import RotatingFileHandler
 from sqlalchemy.exc import IntegrityError
 from flask_admin import Admin
 from cryptography.fernet import Fernet
@@ -11,7 +11,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from apscheduler.events import EVENT_JOB_MISSED, EVENT_JOB_ERROR, EVENT_JOB_EXECUTED, EVENT_JOB_ADDED, \
     EVENT_JOB_REMOVED, EVENT_JOB_SUBMITTED
 
-from ipmi.config import config_defaults, scheduler_jobs, logging_config
+from ipmi.config import config_defaults, scheduler_jobs
 
 
 # run the following to start server
@@ -43,15 +43,15 @@ def setup_flask_admin(app_instance, session):
     return app_instance
 
 
-def setup_logger(log_config: dict, file_path: str):
+def setup_logger(file_path: str, app_instance: Flask):
     if not os.path.exists(file_path):
         if file_path.endswith(('/', '\\')):
             os.mkdir(file_path)
             file_path = os.path.normpath(os.path.join(file_path, 'ipmi.log'))
         else:
             file_path = os.path.normpath(file_path)
-    log_config['handlers']['file_log']['filename'] = file_path
-    dictConfig(log_config)
+    file_handler = RotatingFileHandler(filename=file_path, mode='a', maxBytes=100000, backupCount=0)
+    app_instance.logger.addHandler(file_handler)
 
 
 def generate_key(salt, token) -> Fernet:
@@ -127,10 +127,9 @@ def create_app(test_config=None):
         log_path = helpers.get_config_value('log_path')
         if not log_path:
             log_path = os.path.normpath(os.path.join(app.instance_path, 'ipmi.log'))
-        setup_logger(logging_config, file_path=log_path)
+        setup_logger(file_path=log_path, app_instance=app)
         alert_handler = helpers.AlertLogHandler(alert_model=Alert, app_context=app, db_session=db.session)
         alert_handler.setLevel(logging.WARNING)  # prevent overflow of alerts
-        alert_handler.setFormatter(logging.Formatter('%(levelname)s - %(message)s'))
         app.logger.addHandler(alert_handler)
 
         # setup encrypt & decrypt methods in app instance

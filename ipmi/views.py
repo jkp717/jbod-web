@@ -15,7 +15,7 @@ from serial.tools.list_ports import comports
 from ipmi import helpers
 from ipmi.models import db, PhySlot, FanSetpoint, Fan, Controller, SysConfig, Chassis, SysJob, Alert
 from ipmi.jobs import scheduler, query_disk_properties, query_controller_properties, \
-    truenas_connection_info, get_console, ping_controllers, console_connection_check
+    truenas_connection_info, get_console, ping_controllers, console_connection_check, sound_controller_alarm
 from ipmi.jobs.events import fan_calibration_job_listener
 
 
@@ -176,8 +176,6 @@ class FanView(JBODBaseView):
         fan_id = int(request.args.get('id'))
         if not fan_id:
             return jsonify({'result': 'error', 'message': 'fan id required'}), 400
-        # fan = fan_calibration(int(request.args.get('id')))
-        # db.session.commit()
         job_uuid = uuid.uuid4()
         calibration_job = {
             "id": str(job_uuid),
@@ -185,8 +183,7 @@ class FanView(JBODBaseView):
             "func": "ipmi.jobs:fan_calibration",
             "replace_existing": True,
             "args": (fan_id,),
-            "trigger": "date",  # triggers once on the given datetime (immediately if no run_date).
-            "run_date": None
+            # omit trigger to run immediately
         }
         fan = helpers.get_model_by_id(Fan, int(fan_id))
         fan.calibration_job_uuid = str(job_uuid)
@@ -398,6 +395,7 @@ class ControllerView(JBODBaseView):
     list_template = 'refresh_list.html'
     column_list = ['id', 'mcu_device_id', 'firmware_version', 'fan_port_cnt', 'psu_on', 'alive']
     column_formatters = {'id': helpers.controller_id_formatter}
+    column_extra_row_actions = [helpers.ControllerAlarmRowAction()]
 
     def get_empty_list_message(self):
         return Markup(f"<a href={self.get_url('.ping')}>Search for connected Controllers</a>")
@@ -413,6 +411,21 @@ class ControllerView(JBODBaseView):
 
     def on_model_change(self, form, model, is_created):
         helpers.cascade_controller_fan(model, form, is_created)
+
+    @expose('/alarm/<controller_id>', methods=['GET'])
+    def alarm(self, controller_id):
+        job_uuid = uuid.uuid4()
+        calibration_job = {
+            "id": str(job_uuid),
+            "name": "sound_controller_alarm",
+            "func": "ipmi.jobs:sound_controller_alarm",
+            "replace_existing": True,
+            "args": (controller_id,),
+            # omit trigger to run immediately
+        }
+        scheduler.add_job(**calibration_job)
+        flash(f"Triggering alarm sound on controller {controller_id}...")
+        return redirect(self.get_url('.index_view'))
 
     @expose('/ping', methods=['GET'])
     def ping(self):

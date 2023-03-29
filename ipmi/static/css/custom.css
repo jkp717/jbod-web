@@ -233,6 +233,13 @@
     width: 60px;
 }
 
+.mdl-sound {
+    width: 17px;
+    display: inline-block;
+    margin: auto;
+    text-align: center;
+}
+
 .chassis-card-title {
     margin-left: 10px;
     margin-top: 20px;

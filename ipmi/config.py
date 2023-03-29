@@ -54,29 +54,3 @@ scheduler_jobs = [
         'hours': 2
     },
 ]
-
-logging_config = {
-    'version': 1,
-    'formatters': {
-        'default': {
-            'format': '[%(asctime)s] %(levelname)s in %(module)s: %(message)s',
-        }
-    },
-    'handlers': {
-        'wsgi': {
-            'class': 'logging.StreamHandler',
-            'stream': 'ext://flask.logging.wsgi_errors_stream',
-            'formatter': 'default'
-        },
-        'file_log': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'maxBytes': 100000,
-            'backupCount': 0,
-            'formatter': 'default'
-        }
-    },
-    'root': {
-        'level': 'INFO',
-        'handlers': ['wsgi', 'file_log']
-    }
-}

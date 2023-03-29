@@ -3,9 +3,6 @@ from ipmi import helpers, jobs
 from ipmi.models import db, Fan
 
 
-_logger = logging.getLogger(__name__)
-
-
 def fan_calibration_job_listener(event):
     """Single trigger event listener"""
     with jobs.scheduler.app.app_context():
@@ -26,35 +23,35 @@ def fan_calibration_job_listener(event):
 def job_missed_listener(event):
     """Job missed event."""
     with jobs.scheduler.app.app_context():
-        _logger.warning("Job %s missed by scheduler.", event.job_id)
+        jobs.scheduler.app.logger.warning(f"Job {event.job_id} missed by scheduler.")
 
 
 def job_error_listener(event):
     """Job error event."""
     with jobs.scheduler.app.app_context():
         # TODO: add check for consecutive failed attempts; then remove job when exceeded
-        _logger.error("Scheduled job %s failed. Error: %s", event.job_id, event.exception)
+        jobs.scheduler.app.logger.error(f"Scheduled job {event.job_id} failed. Error: {event.exception}")
 
 
 def job_executed_listener(event):
     """Job executed event."""
     with jobs.scheduler.app.app_context():
-        _logger.info("Scheduled job %s executed.", event.job_id)
+        jobs.scheduler.app.logger.info(f"Scheduled job {event.job_id} executed.")
 
 
 def job_added_listener(event):
     """Job added event."""
     with jobs.scheduler.app.app_context():
-        _logger.info("Scheduled job %s added to job store.", event.job_id)
+        jobs.scheduler.app.logger.info(f"Scheduled job {event.job_id} added to job store.")
 
 
 def job_removed_listener(event):
     """Job removed event."""
     with jobs.scheduler.app.app_context():
-        _logger.info("Scheduled job %s removed to job store.", event.job_id)
+        jobs.scheduler.app.logger.info(f"Scheduled job {event.job_id} removed to job store.")
 
 
 def job_submitted_listener(event):
     """Job scheduled to run event."""
     with jobs.scheduler.app.app_context():
-        _logger.info("Scheduled job %s was submitted to its executor to be run.", event.job_id)
+        jobs.scheduler.app.logger.info(f"Scheduled job {event.job_id} was submitted to its executor to be run.")
