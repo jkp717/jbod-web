@@ -6,7 +6,7 @@ from sqlalchemy.sql import text
 from flask_apscheduler import APScheduler
 from serial import SerialException, serial_for_url
 from ipmi.models import db, SysConfig, Disk, DiskTemp, Chassis, Fan, FanSetpoint, Controller, PhySlot
-from ipmi.console import JBODCommand, JBODConsole, JBODConsoleException
+from ipmi.console import JBODCommand, JBODConsole, JBODConsoleException, JBODRxData
 from ipmi import helpers
 from ipmi.jobs import events as ev
 from ipmi.config import MIN_FAN_PWM, MAX_FAN_PWM
@@ -30,8 +30,7 @@ def get_console() -> Union[JBODConsole, None]:
                         baudrate=int(helpers.get_config_value('baud_rate')),
                         timeout=int(helpers.get_config_value('console_timeout')),
                         do_not_open=True),
-                    callback=helpers.console_callback,
-                    cxt=current_app
+                    callback=console_callback,
                 )
                 tty.start()
                 current_app.__setattr__('console', tty)
@@ -377,3 +376,77 @@ def test_fan_job(fan_id) -> None:
         time.sleep(randint(7, 10))
         scheduler.app.logger.debug(f"test_fan_job ran! fan_id: {fan_id}")
 
+
+def _truenas_shutdown(tty: JBODConsole):
+    with scheduler.app.app_context():
+        scheduler.app.logger.info("Shutdown request received from controller. "
+                                  "Attempting to shutdown host now.")
+        resp = helpers.truenas_api_request(
+            'POST',
+            '/api/v2.0/system/shutdown',
+            headers={'Content-Type': 'application/json'},
+            data={"delay": 0}
+        )
+        if resp.status_code == 200:
+            scheduler.app.logger.info("Host confirmed shutdown request. Shutting down...")
+            tty.command_write(tty.ctrlc.ACK)
+        else:
+            scheduler.app.logger.info("Host shutdown request failed! Attempting to cancel shutdown...")
+            # shutdown failed; send cancellation to all controllers
+            for controller in db.session.query(Controller).all():
+                try:
+                    tty.command_write(JBODCommand.CANCEL_SHUTDOWN, controller.id)
+                except JBODConsoleException:
+                    pass
+
+
+def console_callback(tty: JBODConsole, rx: JBODRxData):
+    """
+    Function called when data is received from controller that was not
+    requested by JBODConsole write_command
+    """
+    with scheduler.app.app_context():
+        if rx.xoff:
+            _truenas_shutdown(tty)
+        elif rx.xon:
+            scheduler.app.logger.warning("ACPI ON Event received but host is already on! %s", rx)
+        elif rx.dc2:
+            # Device Control 2 used to broadcast controller psu, rpm, and pwm data
+            # response example: {466-2038344B513050-19-1003:{psu:ON,rpm:[1000,1200,0,3000],pwm:[40,30,0,20]}}
+            scheduler.app.logger.debug("Attempting to parse rpm data: %s", rx)
+            try:
+                resp = json.loads(rx.data)
+                ctrlr = db.session.query(Controller).where(Controller.mcu_device_id == resp['mcu']).first()
+
+                # update psu status if needed
+                if (ctrlr.psu_on == True and resp['psu'] != "ON") or (ctrlr.psu_on == False and resp['psu'] == "ON"):
+                    ctrlr.psu_on = resp['psu'] == "ON"
+                    scheduler.app.logger.info("psu status for %s updated to %s", ctrlr.mcu_device_id, ctrlr.psu_on)
+                    db.session.commit()
+
+                # update fan(s) rpm and pwm values
+                for i, rpm in enumerate(resp['data']['rpm']):
+                    fan = db.session.query(Fan).where(Fan.controller_uuid == ctrlr.id, Fan.port_num == i+1).first()
+                    if not fan:
+                        scheduler.app.logger.warning("Unable to find associated fan for rpm data: %s", rx)
+                    else:
+                        fan.pwm = resp['data']['pwm'][i]
+                        # remove noise by only recording changes +/- 50 rpm
+                        if fan.rpm in range(int(rpm)-50, int(rpm)+50):
+                            fan.rpm = int(rpm)
+                            fan.rpm_deviation = helpers.fan_rpm_deviation(fan)
+                            scheduler.app.logger.debug("Stored fan[%s] rpm: %s; Deviation: %s",
+                                                       fan.id, fan.rpm, fan.rpm_deviation)
+                        db.session.commit()
+            except Exception:  # noqa
+                scheduler.app.logger.error("Unable to parse controller data: %s", rx)
+        elif rx.dc4:
+            # misc controller event messages
+            msg_type, msg_body = rx.data.split(":")[0], rx.data.split(":")[1]
+            if msg_type == 'reset_event':
+                rst_code = helpers.ResetEvent(int(msg_body)).name
+                scheduler.app.logger.warning("Controller reset event: %s", rst_code)
+            else:
+                scheduler.app.logger.warning("Unknown ds4 event message received: %s", rx)
+        else:
+            scheduler.app.logger.warning("Uncaught console event received: %s", rx)

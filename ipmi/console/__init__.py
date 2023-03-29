@@ -298,13 +298,6 @@ class JBODConsole:
             fmt_command = command.value
         b = bytearray(str(fmt_command), self.ENCODING)  # convert str to bytearray
         b.extend(self.TERMINATOR)  # add terminator to end of bytearray
-        # if self.TESTING:
-        #     if bytes(b) in ack_tests.keys():
-        #         b = ack_tests[bytes(b)]
-        #     else:
-        #         for k, v in ack_tests.items():
-        #             if isinstance(k, re.Pattern):
-        #                 b = v if self._command_match(k, bytes(b).decode('ASCII')) else b
         self.serial.write(bytes(b))  # convert bytearray to bytes
         resp = JBODRxData(self.receive_now())
         if not resp.ack:
