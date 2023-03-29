@@ -1,4 +1,5 @@
 import time
+import json
 from typing import Optional, Union
 from flask import current_app
 from sqlalchemy.sql import text
@@ -222,6 +223,8 @@ def ping_controllers(controller_id: Optional[int] = None) -> Union[list[dict], l
                 dev_id = tty.command_write(JBODCommand.DEVICE_ID, next_id)
                 resp.append({"id": next_id, "mcu_device_id": str(dev_id.data)})
             except JBODConsoleException:
+                if next_id == 1:
+                    current_app.logger.error(f"Controller on {tty.serial.port} did not respond to ID request.")
                 break
             if next_id == controller_id:
                 break
@@ -266,10 +269,10 @@ def database_cleanup():
         db.session.commit()
 
 
-def poll_fan_rpm() -> None:
+def poll_controller_data() -> None:
     """
-    Job sends a non-blocking rpm request to controller through
-    the console write thread.  Responses are handled by the console
+    Job sends a non-blocking data request to controller through
+    the console write thread. Responses are handled by the console
     callback (ds2 messages).
     """
     with scheduler.app.app_context():
@@ -278,7 +281,6 @@ def poll_fan_rpm() -> None:
             if not tty.serial.is_open:
                 raise SerialException("Serial connection not established.")
             # controller responds to DC2 requests with json-like object
-            # with mcu_id as key and list of fan's rpm as value
             tty.transmit(tty.ctrlc.DC2)
 
 
@@ -296,6 +298,10 @@ def fan_calibration(fan_id: int) -> None:
         if not tty:
             raise SerialException("Serial connection not established.")
         fan_model = helpers.get_model_by_id(Fan, fan_id)
+        psu_status = tty.command_write(JBODCommand.STATUS, fan_model.controller_id)
+        if psu_status.data != 'ON':
+            raise Exception(f"Controller {fan_model.controller_id} psu status is {psu_status.data}; "
+                            f"skipping fan_calibration.")
         # pwm fan‘s speed scales broadly linear with the duty-cycle of the PWM signal between
         # maximum speed at 100% PWM and the specified minimum speed at 20% PWM
         if not fan_model.pwm:
