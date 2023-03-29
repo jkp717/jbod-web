@@ -415,7 +415,7 @@ def console_callback(tty: JBODConsole, rx: JBODRxData):
             # response example: {466-2038344B513050-19-1003:{psu:ON,rpm:[1000,1200,0,3000],pwm:[40,30,0,20]}}
             scheduler.app.logger.debug("Attempting to parse rpm data: %s", rx)
             try:
-                resp = json.loads(rx.data)
+                resp = json.loads(rx.data.strip("\r\n"))
                 ctrlr = db.session.query(Controller).where(Controller.mcu_device_id == resp['mcu']).first()
 
                 # update psu status if needed
