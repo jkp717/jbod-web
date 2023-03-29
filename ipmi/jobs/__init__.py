@@ -219,12 +219,14 @@ def ping_controllers(controller_id: Optional[int] = None) -> Union[list[dict], l
         tty = get_console()
         while True:
             # continue to loop until either NAK or no response
+            dev_id = None
             try:
                 dev_id = tty.command_write(JBODCommand.DEVICE_ID, next_id)
                 resp.append({"id": next_id, "mcu_device_id": str(dev_id.data)})
             except JBODConsoleException:
                 if next_id == 1:
-                    current_app.logger.error(f"Controller on {tty.serial.port} did not respond to ID request.")
+                    current_app.logger.error(f"Controller on {tty.serial.port} did not respond to ID request. "
+                                             f"RX: {dev_id}")
                 break
             if next_id == controller_id:
                 break

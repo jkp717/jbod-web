@@ -41,10 +41,10 @@ scheduler_jobs = [
         'description': 'Poll chassis temperature and set fan(s) PWM according to defined setpoint.',
         'minutes': 2
     }, {
-        'job_id': 'poll_fan_rpm',
-        'func': 'ipmi.jobs:poll_fan_rpm',
-        'job_name': 'Poll Fan RPMs',
-        'description': 'Poll controller(s) to get latest fan RPM.',
+        'job_id': 'poll_controller_data',
+        'func': 'ipmi.jobs:poll_controller_data',
+        'job_name': 'Poll Controller Data',
+        'description': 'Poll controller(s) to get latest fan RPM and PWM, as well as PSU Status.',
         'seconds': 30
     }, {
         'job_id': 'database_cleanup',
