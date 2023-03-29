@@ -198,7 +198,6 @@ class JBODConsole:
         self.receiver_thread = threading.Thread(target=self.reader, name='rx')
         self.receiver_thread.daemon = True
         self.receiver_thread.start()
-        print(f"hello from receiver_thread: {self.receiver_thread}")
 
     def _stop_reader(self):
         """Stop reader thread only, wait for clean exit of thread"""
@@ -217,7 +216,6 @@ class JBODConsole:
         self.transmitter_thread = threading.Thread(target=self.writer, name='tx')
         self.transmitter_thread.daemon = True
         self.transmitter_thread.start()
-        print("hello from transmitter_thread")
 
     def stop(self):
         """set flag to stop worker threads"""
@@ -398,23 +396,22 @@ class JBODConsole:
     def change_port(self, port: str):
         """Change port after initialized"""
         if port and port != self.serial.port:
-            # reader thread needs to be shut down
-            self._stop_reader()
+            if self.alive:
+                self.stop()
+                self.join()
+            if self.serial.is_open:
+                self.serial.close()
             # save settings
             settings = self.serial.getSettingsDict()
             try:
                 new_serial = serial.serial_for_url(port, do_not_open=True)
                 # restore settings and open
                 new_serial.applySettingsDict(settings)
-                new_serial.open()
+                self.serial = new_serial
+                self.start()
             except serial.SerialException as e:
                 self.serial.close()
-                self.stop()
                 raise e
-            else:
-                self.serial.close()
-                self.serial = new_serial
-                # self.start() # already started, no need to (re)start
 
 
 ack_tests = {

@@ -347,3 +347,22 @@ class FanSetpoint(db.Model):
 
     def __repr__(self):
         return f"(Setpoint: {self.temp} | PWM: {self.pwm})"
+
+
+class Alert(db.Model):
+    __tablename__ = "alert"
+    id = db.Column(db.Integer, primary_key=True)
+    category = db.Column(db.String)  # same as python logger
+    content = db.Column(db.String)
+    create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
+
+    @hybrid_property
+    def last_update(self):
+        if self.modify_date:
+            return self.modify_date
+        return self.create_date
+
+    def __repr__(self):
+        if self.category:
+            return f"(Alert: {self.id} | Category: {self.category})"

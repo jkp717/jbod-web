@@ -16,7 +16,8 @@ config_defaults = {
     'truenas_url': None,
     'max_chassis_temp': 65,
     'min_chassis_temp': 20,
-    'rpm_watchdog_window': 200
+    'rpm_watchdog_window': 200,
+    'log_path': None
 }
 
 # task scheduler defaults
@@ -69,9 +70,8 @@ logging_config = {
         },
         'file_log': {
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': 'ipmi.log',
-            'maxBytes': 20000,
-            'backupCount': 3,
+            'maxBytes': 100000,
+            'backupCount': 0,
             'formatter': 'default'
         }
     },

@@ -92,6 +92,46 @@ function wsAuthenticate(ws, connectionObj, authSuccessCallback) {
   }
 }
 
+function openAlertSidebar() {
+   $('.navbar-sidebar-content').addClass('show-sidebar');
+}
+
+function closeAlertSidebar() {
+    $('.navbar-sidebar-content').removeClass('show-sidebar');
+}
+
+function deleteAlert(event, alertId, deleteAlertUrl) {
+    $.ajax({
+    url: deleteAlertUrl,
+    type: 'DELETE',
+    success: function(result) {
+        $(event).parent().parent().hide("fast");  // animation hiding element
+        $(event).parent().parent().remove();  // removal of actual li element
+        if ($('#alertSidebar > .navbar-sidebar-content > ul').find("li").length !== 0) {
+            $('#alertSidebar').addClass("navbar-popover-alert");
+        } else {
+            $('#alertSidebar').removeClass("navbar-popover-alert");
+        }
+    }
+    });
+}
+
+function getConsolePortOptions(selectElem, portOptionsUrl) {
+    $.ajax({
+    url: portOptionsUrl,
+    type: 'GET',
+    success: function(result) {
+        result.avail_ports
+        $.each(result.avail_ports, function (i, item) {
+            $(selectElem).append($('<option>', {
+                value: result.avail_ports[i],
+                text : result.avail_ports[i]
+            }));
+        });
+    }
+    });
+}
+
 function updateStatusIcon(options) {
     const statusMsg = options.statusMsg;
     const iconDiv = options.iconDiv;
@@ -99,7 +139,6 @@ function updateStatusIcon(options) {
 
     switch (statusMsg) {
       case 'READY':
-        console.log("connection is ready...");
         iconDiv.querySelector('i').className = 'fa fa-solid fa-check-circle';
         $(iconDiv).removeClass('disconnected');
         break;
@@ -125,6 +164,12 @@ function updateStatusIcon(options) {
         popoverDiv.addClass("navbar-popover-alert");
     }
 
+    // check for any disconnected children and update badge icon flag
+    if (popoverDiv.find('.popover-content-attr.disconnected').length !== 0) {
+        popoverDiv.addClass('navbar-icon-alert');
+    } else {
+        popoverDiv.removeClass('navbar-icon-alert');
+    }
 
     iconDiv.querySelector('i').title = statusMsg;
     // Destroy and then recreate popover with new content
@@ -150,19 +195,35 @@ function modalFormHandler(formElementId, formUrl) {
       if (resp['result'] == 'success') {
         document.querySelector('a[data-target="' + modalIdSelector + '"] > span').className = "fa fa-solid fa-check-circle";
         createAlertElements("success", resp["msg"]);
-        updateStatusIcon({
+        if (formElementId == "host-setup-form") {
+          updateStatusIcon({
+            statusMsg: "READY",
+            popoverDiv: $('#connStatusPopover'),
+            iconDiv: document.getElementById("hostConnStatus")
+          });
+        } else {
+          updateStatusIcon({
             statusMsg: "READY",
             popoverDiv: $('#connStatusPopover'),
             iconDiv: document.getElementById("controllerConnStatus")
-        });
+          });
+        }
       } else {
         document.querySelector('a[data-target="' + modalIdSelector + '"] > span').className = "fa fa-solid fa-question-circle";
         createAlertElements("danger", resp["msg"]);
-        updateStatusIcon({
-            statusMsg: resp['result'].toUpperCase(),
+        if (formElementId == "host-setup-form") {
+          updateStatusIcon({
+            statusMsg: resp["result"].toUpperCase(),
+            popoverDiv: $('#connStatusPopover'),
+            iconDiv: document.getElementById("hostConnStatus")
+          });
+        } else {
+          updateStatusIcon({
+            statusMsg: resp["result"].toUpperCase(),
             popoverDiv: $('#connStatusPopover'),
             iconDiv: document.getElementById("controllerConnStatus")
-        });
+          });
+        }
       }
     });
     // Define what happens in case of error

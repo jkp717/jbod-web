@@ -1,3 +1,4 @@
+import logging
 import os
 import base64
 from flask import Flask
@@ -15,9 +16,6 @@ from ipmi.config import config_defaults, scheduler_jobs, logging_config
 
 # run the following to start server
 # sudo gunicorn -w 1 -b 0.0.0.0 'ipmi:create_app()' --threads 3
-
-
-dictConfig(logging_config)
 
 
 def setup_flask_admin(app_instance, session):
@@ -40,8 +38,20 @@ def setup_flask_admin(app_instance, session):
     admin.add_view(vw.TaskView(mdl.SysJob, session, name='Scheduled Tasks', endpoint='jobs', category='Settings'))
     admin.add_view(vw.SetpointView(mdl.FanSetpoint, session, name='setpoints', endpoint='setpoints'))
     admin.add_view(vw.NewSetupView(name='Setup', endpoint='setup'))
+    admin.add_view(vw.AlertView(mdl.Alert, session, endpoint='alerts'))
 
     return app_instance
+
+
+def setup_logger(log_config: dict, file_path: str):
+    if not os.path.exists(file_path):
+        if file_path.endswith(('/', '\\')):
+            os.mkdir(file_path)
+            file_path = os.path.normpath(os.path.join(file_path, 'ipmi.log'))
+        else:
+            file_path = os.path.normpath(file_path)
+    log_config['handlers']['file_log']['filename'] = file_path
+    dictConfig(log_config)
 
 
 def generate_key(salt, token) -> Fernet:
@@ -86,8 +96,8 @@ def create_app(test_config=None):
         pass
 
     from ipmi import jobs
-    from ipmi.models import db, SysConfig, SysJob
-    from ipmi.helpers import get_config_value, disk_tooltip_html, svg_html_converter
+    from ipmi.models import db, SysConfig, SysJob, Alert
+    from ipmi import helpers
 
     # initialize flask addons
     db.init_app(app)
@@ -112,6 +122,16 @@ def create_app(test_config=None):
                     db.session.commit()
                 except IntegrityError:
                     db.session.rollback()
+
+        # setup logger
+        log_path = helpers.get_config_value('log_path')
+        if not log_path:
+            log_path = os.path.normpath(os.path.join(app.instance_path, 'ipmi.log'))
+        setup_logger(logging_config, file_path=log_path)
+        alert_handler = helpers.AlertLogHandler(alert_model=Alert, app_context=app, db_session=db.session)
+        alert_handler.setLevel(logging.WARNING)  # prevent overflow of alerts
+        alert_handler.setFormatter(logging.Formatter('%(levelname)s - %(message)s'))
+        app.logger.addHandler(alert_handler)
 
         # setup encrypt & decrypt methods in app instance
         _ceph = generate_key(app.config['SECRET_KEY'], app.config['SECRET_KEY_SALT'])
@@ -141,8 +161,9 @@ def create_app(test_config=None):
     # add custom functions to jinja environment
     app.jinja_env.globals.update(truenas_connection_info=jobs.truenas_connection_info)
     app.jinja_env.globals.update(get_serial_connection=jobs.console_connection_check)
-    app.jinja_env.globals.update(disk_tooltip_html=disk_tooltip_html)
-    app.jinja_env.globals.update(svg_html_converter=svg_html_converter)
+    app.jinja_env.globals.update(disk_tooltip_html=helpers.disk_tooltip_html)
+    app.jinja_env.globals.update(svg_html_converter=helpers.svg_html_converter)
+    app.jinja_env.globals.update(get_alerts=helpers.get_alerts)
     # app.jinja_env.globals.update(debug=debug)
     return app
 

@@ -13,9 +13,9 @@ from requests.exceptions import MissingSchema
 from serial.tools.list_ports import comports
 
 from ipmi import helpers
-from ipmi.models import db, PhySlot, FanSetpoint, Fan, Controller, SysConfig, Chassis, SysJob
+from ipmi.models import db, PhySlot, FanSetpoint, Fan, Controller, SysConfig, Chassis, SysJob, Alert
 from ipmi.jobs import scheduler, query_disk_properties, query_controller_properties, \
-    truenas_connection_info, get_console, ping_controllers
+    truenas_connection_info, get_console, ping_controllers, console_connection_check
 from ipmi.jobs.events import fan_calibration_job_listener
 
 
@@ -39,7 +39,7 @@ class IndexView(BaseView):
     def index(self):
         setup_required = {
             'truenas': truenas_connection_info() is not None,
-            'controller': get_console() is not None,
+            'controller': console_connection_check(),
             'chassis': helpers.get_model_by_id(Chassis, 1) is not None,
             'jobs': db.session.query(SysJob).where(SysJob.active == False).all() is None,  # noqa
         }
@@ -106,10 +106,15 @@ class NewSetupView(BaseView):
                                 }), 400
                 model.value = v if not model.encrypt else current_app.encrypt(v.encode())
             db.session.commit()
-            return jsonify({"result": "success", "msg": "Successfully established serial connection."}), 200
+            if console_connection_check():
+                return jsonify({"result": "success", "msg": "Successfully established serial connection."}), 200
+            return jsonify({"result": "error", "msg": "Unable to establish connection with serial controller."}), 400
         if request.method == 'GET':
             # return a list of usable COM ports
-            return jsonify({"avail_ports": [com.device for com in comports()]}), 200
+            coms = [com.device for com in comports()]
+            if current_app.config['TESTING']:
+                coms.append('loop://')
+            return jsonify({"avail_ports": coms}), 200
 
     def is_visible(self):
         return False
@@ -485,3 +490,18 @@ class TaskView(JBODBaseView):
             scheduler.add_job(**model.job_dict)
         elif job and not model.active:
             scheduler.remove_job(model.job_id)
+
+
+class AlertView(JBODBaseView):
+
+    def is_visible(self):
+        return False
+
+    @expose('/delete/<alert_id>', methods=['POST', 'DELETE'])
+    def delete_alert(self, alert_id):
+        alert = helpers.get_model_by_id(Alert, int(alert_id))
+        if not alert:
+            return jsonify({"result": "error", "msg": f"alert {alert_id} not found."}), 400
+        db.session.delete(alert)
+        db.session.commit()
+        return jsonify({"result": "success"}), 200

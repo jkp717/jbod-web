@@ -8,10 +8,10 @@
 
 {% block access_control %}
 {% with serial = get_serial_connection() %}
-<span id="connStatusPopover" class="navbar-popover{{ ' navbar-popover-alert' if not serial else '' }}">
+<span id="connStatusPopover" class="navbar-popover{{ ' navbar-icon-alert' if not serial else '' }}">
     <a tabindex="0"  type="button" data-container="body" data-toggle="popover" data-trigger="focus" data-placement="bottom">
       <i id="connStatusPopoverIcon" class="fa fa-chain"></i>
-        <span class="navbar-popover-badge"></span>
+        <span class="navbar-icon-badge"></span>
     </a>
     <div class="popover-container">
         <div class="popover-content">
@@ -21,15 +21,22 @@
     </div>
 </span>
 {% endwith %}
-<span id="alertPopover" class="navbar-popover" data-flag="false">
-    <a tabindex="0"  type="button" data-container="body" data-toggle="popover" data-trigger="focus" data-placement="bottom">
-        <i id="alertPopoverIcon" class="fa fa-bell"></i>
-        <span class="navbar-popover-badge"></span>
+{% with alerts = get_alerts() %}
+<span id="alertSidebar" class="navbar-sidebar{{ ' navbar-icon-alert' if alerts else '' }}">
+    <a tabindex="0"  type="button" onclick="openAlertSidebar();">
+        <i id="alertSidebarIcon" class="fa fa-bell"></i>
+        <span class="navbar-icon-badge"></span>
     </a>
-    <div class="popover-container">
-        <span>No alerts...</span>
+    <div class="navbar-sidebar-content">
+        <span class="close-sidebar" onclick="closeAlertSidebar();">&times;</span>
+        <ul>
+        {% for alert in alerts %}
+          <li><div><b>{{alert.category|safe }}:</b><span class="close-alert" onclick="deleteAlert(this, {{ alert.id }}, '{{ get_url('alerts.delete_alert', alert_id=alert.id) }}');">&times;</span></div>{{ alert.content|safe }}</li>
+        {% endfor %}
+        </ul>
     </div>
 </span>
+{% endwith %}
 {% endblock %}
 
 {% block brand %}
@@ -52,10 +59,6 @@
 $(function () {
   $('#connStatusPopover > a').popover({
     content: document.querySelector('#connStatusPopover > .popover-container').innerHTML,
-    html: true
-  });
-  $('#alertPopover > a').popover({
-    content: document.querySelector('#alertPopover > .popover-container').innerHTML,
     html: true
   });
 });

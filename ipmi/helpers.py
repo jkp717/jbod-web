@@ -1,7 +1,7 @@
 import os
 import math
 import sys
-
+import logging
 import requests
 from typing import Optional, Iterable, Union
 from enum import IntEnum
@@ -12,7 +12,7 @@ from datetime import datetime
 from flask_admin.model import typefmt
 from flask_admin.model.template import TemplateLinkRowAction
 
-from ipmi.models import db, FanSetpoint, SysConfig, Disk, Controller, Fan
+from ipmi.models import db, FanSetpoint, SysConfig, Disk, Controller, Fan, Alert
 from ipmi.console import JBODRxData, JBODConsole, JBODCommand, JBODConsoleException, ResetEvent
 
 from ipmi.config import MAX_FAN_PWM, MIN_FAN_PWM
@@ -29,6 +29,11 @@ class StatusFlag(IntEnum):
 def get_config_value(config_param: str):
     with current_app.app_context():
         return db.session.query(SysConfig.value).where(SysConfig.key == config_param).first()[0]
+
+
+def get_alerts():
+    with current_app.app_context():
+        return db.session.query(Alert).all()
 
 
 def truenas_api_request(method: str, url_path: str, headers: Optional[dict] = None, data: Optional[dict] = None):
@@ -290,7 +295,19 @@ def fan_rpm_deviation(fan: Fan, pwm: Optional[int] = None) -> int:
     return 0
 
 
-# Fan Changes
-# rpm change -> active
-# poll setpoints -> boilerplate
-#
+class AlertLogHandler(logging.Handler):
+
+    def __init__(self, alert_model, app_context: Flask, db_session):
+        logging.Handler.__init__(self)
+        self.app_context = app_context
+        self.db_session = db_session
+        self.alert_model = alert_model
+        self.log_msg = None
+
+    def emit(self, record):
+        # Clear the log message so it can be put to db via sql (escape quotes)
+        self.log_msg = record.msg.strip().replace('\'', '\'\'')
+        # Make the SQL insert
+        with self.app_context.app_context():
+            self.db_session.add(self.alert_model(category=record.levelname, content=self.log_msg))
+            self.db_session.commit()

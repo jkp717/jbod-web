@@ -9,7 +9,7 @@
         <b>{{ "" if setup_complete else "Setup Required!" }}</b> Click links below to complete. <i class="support-text">Settings can be updated at any time in the Settings tab.</i>
       </p>
       <div class="list-group">
-        <a href="#" class="list-group-item list-group-item-action" data-toggle="modal" data-target="#truenas-setup-modal">
+        <a href="#" class="list-group-item list-group-item-action" data-toggle="modal" data-target="#host-setup-modal">
           {% if setup_required.truenas %}
           <span class="fa fa-solid fa-check-circle" style="padding-right: 20px;"></span>
           {% else %}
@@ -17,7 +17,7 @@
           {% endif %}
           Setup TrueNAS API connection
         </a>
-        <a href="#" class="list-group-item list-group-item-action" data-toggle="modal" data-target="#controller-setup-modal">
+        <a href="#" class="list-group-item list-group-item-action" data-toggle="modal" data-target="#controller-setup-modal" onclick="getConsolePortOptions('#console_port', '{{ get_url('setup.controller') }}');">
           {% if setup_required.controller %}
           <span class="fa fa-solid fa-check-circle" style="padding-right: 20px;"></span>
           {% else %}
@@ -46,7 +46,7 @@
   </div>
 </div>
 <!-- TrueNAS API Modal -->
-<div class="modal fade" id="truenas-setup-modal" tabindex="-1" role="dialog" aria-labelledby="truenas-setup-modal" aria-hidden="true">
+<div class="modal fade" id="host-setup-modal" tabindex="-1" role="dialog" aria-labelledby="host-setup-modal" aria-hidden="true">
   <div class="modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
@@ -56,7 +56,7 @@
         </button>
       </div>
       <div class="modal-body">
-        <form action="{{ get_url('setup.truenas') }}" id="truenas-setup-form" enctype="multipart/form-data" method="POST" role="form">
+        <form action="{{ get_url('setup.truenas') }}" id="host-setup-form" enctype="multipart/form-data" method="POST" role="form">
           <div class="form-group">
             <label for="truenas_url">TrueNAS URL</label>
             <input class="form-control" id="truenas_url" placeholder="http://">
@@ -93,7 +93,8 @@
         <form action="" id="controller-setup-form" enctype="multipart/form-data" method="POST" role="form">
           <div class="form-group">
             <label for="console_port">Serial Port</label>
-            <input class="form-control" id="console_port">
+            <select class="form-control" id="console_port">
+            </select>
             <small id="console-port-help" class="form-text text-muted">Controller port address (ie /dev/ttyS0, etc)</small>
           </div>
           <div class="modal-footer">
@@ -107,7 +108,7 @@
 </div>
 <script>
 $(function() {
-  modalFormHandler("truenas-setup-form", "{{ get_url('setup.truenas') }}");
+  modalFormHandler("host-setup-form", "{{ get_url('setup.truenas') }}");
   modalFormHandler("controller-setup-form", "{{ get_url('setup.controller') }}");
 });
 </script>
