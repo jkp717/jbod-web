@@ -1,3 +1,8 @@
+#
+# Webapp Configurations
+#
+
+
 # Max should not be 100, controller only supports two digits
 MAX_FAN_PWM = 99
 
