@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='jbod-ipmi',
+    name='jbod-web',
     version='1.0.0',
     author='Josh Price',
     author_email='joshkprice717@gmail.com',
@@ -12,6 +12,7 @@ setup(
         'flask',
         'requests',
         'flask_apscheduler',
+        'apscheduler',
         'flask_admin',
         'flask_sqlalchemy',
         'cryptography',
