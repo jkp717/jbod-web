@@ -35,7 +35,7 @@ class JBODConsoleAckException(JBODConsoleException):
             self.response = f"; Response {response}"
         if not message:
             message = "Command not acknowledged by JBOD Controller"
-        self.message = f"{message}{command_req}{command_args}{response}"
+        self.message = f"{message} {command_req} {command_args} {response}"
         super().__init__(self.message)
 
 
@@ -88,13 +88,14 @@ class JBODRxData:
     ENCODING = "ASCII"
 
     def __init__(self, data: bytes):
-        self._raw_data = data
-        self._ack = False
-        self._xon = False
-        self._xoff = False
-        self._dc2 = False
-        self._dc4 = False
+        self.raw_data = data
         self._data = None
+        # Set initial values to False
+        self.ack = False
+        self.xon = False
+        self.xoff = False
+        self.dc2 = False
+        self.dc4 = False
         # ACK & NAK ascii character as bytes
         self._ackc = str(JBODControlCharacter.ACK.value).encode(self.ENCODING)
         self._nakc = str(JBODControlCharacter.NAK.value).encode(self.ENCODING)
@@ -108,61 +109,22 @@ class JBODRxData:
         self._parse_data(data)
 
     @property
-    def raw_data(self):
-        return self._raw_data
-
-    @property
-    def ack(self):
-        return self._ack
-
-    @ack.setter
-    def ack(self, val: bytes):
-        self._ack = (self._ackc == val)
-
-    @property
-    def xon(self):
-        return self._xon
-
-    @xon.setter
-    def xon(self, val: bytes):
-        self._xon = (self._xonc == val)
-
-    @property
-    def xoff(self):
-        return self._xoff
-
-    @xoff.setter
-    def xoff(self, val: bytes):
-        self._xoff = (self._xoffc == val)
-
-    @property
-    def dc2(self):
-        return self._dc2
-
-    @dc2.setter
-    def dc2(self, val: bytes):
-        self._dc2 = (self._dc2c == val)
-
-    @property
-    def dc4(self):
-        return self._dc2
-
-    @dc4.setter
-    def dc4(self, val: bytes):
-        self._dc4 = (self._dc4c == val)
-
-    @property
     def data(self):
         return self._data
 
+    @data.setter
+    def data(self, val: Union[bytearray, str]):
+        if isinstance(val, bytearray):
+            self._data = val.decode(self.ENCODING)
+        else:
+            self._data = val
+
     def _parse_data(self, data: bytes):
-        d = tuple(filter(None, data.decode(self.ENCODING).strip('\r\n').split('\x00')))
-        for prop in ['ack', 'xon', 'xoff', 'dc2', 'dc4']:
-            self.__setattr__(prop, d[0].encode(self.ENCODING))
-        try:
-            self._data = d[1]
-        except IndexError:
-            self._data = None
+        for prop, cc in [('ack', '_ackc'), ('xon', '_xonc'), ('xoff', '_xoffc'), ('dc2', '_dc2c'), ('dc4', '_dc4c')]:
+            if bytearray(data).startswith(self.__getattribute__(cc)):
+                self.__setattr__(prop, True)
+                self.data = bytearray(data).removeprefix(self.__getattribute__(cc)).strip(b'\r\n')
+                break
 
     def __repr__(self):
         return f"JBODRxData(ack={self.ack},xon={self.xon},xoff={self.xoff},dc2={self.dc2},dc4={self.dc4}," \
@@ -308,6 +270,7 @@ class JBODConsole:
         return resp
 
     def flush_buffers(self):
+        self._data_received = None
         self.rx_buffer = None
         self.tx_buffer = None
 
