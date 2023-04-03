@@ -15,7 +15,7 @@ from webapp.config import config_defaults, scheduler_jobs
 
 
 # run the following to start server
-# sudo gunicorn -w 1 -b 0.0.0.0 'ipmi:create_app()' --threads 3
+# sudo gunicorn -w 1 -b 0.0.0.0 'webapp:create_app()' --threads 10
 
 
 def setup_flask_admin(app_instance, session):
@@ -153,5 +153,6 @@ def create_app(dev=False):
     app.jinja_env.globals.update(disk_tooltip_html=helpers.disk_tooltip_html)
     app.jinja_env.globals.update(svg_html_converter=helpers.svg_html_converter)
     app.jinja_env.globals.update(get_alerts=helpers.get_alerts)
+
     return app
 
