@@ -108,11 +108,25 @@ function deleteAlert(event, alertId, deleteAlertUrl) {
         $(event).parent().parent().hide("fast");  // animation hiding element
         $(event).parent().parent().remove();  // removal of actual li element
         if ($('#alertSidebar > .navbar-sidebar-content > ul').find("li").length > 0) {
-            $('#alertSidebar').addClass("navbar-popover-alert");
+            $('#alertSidebar').addClass("navbar-icon-alert");
         } else {
-            $('#alertSidebar').removeClass("navbar-popover-alert");
+            $('#alertSidebar').removeClass("navbar-icon-alert");
         }
     }
+    });
+}
+
+function deleteAllAlerts(deleteAllAlertsUrl) {
+    $.ajax({
+    url: deleteAllAlertsUrl,
+    type: 'DELETE',
+    success: function(result) {
+            $('#alertSidebar > .navbar-sidebar-content > ul').find("li").each(function() {
+                $(this).hide("fast");
+                $(this).remove();
+            });
+            $('#alertSidebar').removeClass("navbar-icon-alert");
+        }
     });
 }
 
@@ -188,7 +202,7 @@ function updateStatusIcon(options) {
         break;
     }
     if (popoverDiv.find(".popover-content-attr").hasClass('disconnected')) {
-        popoverDiv.addClass("navbar-popover-alert");
+        popoverDiv.addClass("navbar-icon-alert");
     }
 
     // check for any disconnected children and update badge icon flag
