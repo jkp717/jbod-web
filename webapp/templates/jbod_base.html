@@ -29,6 +29,7 @@
     </a>
     <div class="navbar-sidebar-content">
         <span class="close-sidebar" onclick="closeAlertSidebar();">&times;</span>
+        <span href="#" class="sidebar-subtext-link" onclick="deleteAllAlerts('{{ get_url('alerts.delete_alert', alert_id='all') }}');">Clear All</span>
         <ul>
         {% for alert in alerts %}
           <li><div><b>{{alert.category|safe }}:</b><span class="close-alert" onclick="deleteAlert(this, {{ alert.id }}, '{{ get_url('alerts.delete_alert', alert_id=alert.id) }}');">&times;</span></div>{{ alert.content|safe }}</li>
