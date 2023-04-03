@@ -171,7 +171,7 @@ class FanView(JBODBaseView):
         calibration_job = {
             "id": str(job_uuid),
             "name": "fan_calibration",
-            "func": "ipmi.jobs:fan_calibration",
+            "func": "webapp.jobs:fan_calibration",
             "replace_existing": True,
             "args": (fan_id,),
             # omit trigger to run immediately
@@ -413,7 +413,7 @@ class ControllerView(JBODBaseView):
         calibration_job = {
             "id": str(job_uuid),
             "name": "sound_controller_alarm",
-            "func": "ipmi.jobs:sound_controller_alarm",
+            "func": "webapp.jobs:sound_controller_alarm",
             "replace_existing": True,
             "args": (controller_id,),
             # omit trigger to run immediately
