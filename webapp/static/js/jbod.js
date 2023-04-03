@@ -225,73 +225,79 @@ function updateStatusIcon(options) {
  * Welcome Page / Initial Setup
 */
 function modalFormHandler(formElementId, formUrl) {
-  function sendData(data) {
-    const modalXHR = new XMLHttpRequest();
-    // Define what happens on successful data submission
-    modalXHR.addEventListener("load", (event) => {
-      form.reset();
-      var modalIdSelector = "#" + formElementId.replace('-form','-modal');
-      $(modalIdSelector).modal('hide');
-      let resp = JSON.parse(modalXHR.responseText);
-      if (resp['result'] == 'success') {
-        document.querySelector('a[data-target="' + modalIdSelector + '"] > span').className = "fa fa-solid fa-check-circle";
-        createAlertElements("success", resp["msg"]);
-        if (formElementId == "host-setup-form") {
-          updateStatusIcon({
-            statusMsg: "READY",
-            popoverDiv: $('#connStatusPopover'),
-            iconDiv: document.getElementById("hostConnStatus")
-          });
-        } else {
-          updateStatusIcon({
-            statusMsg: "READY",
-            popoverDiv: $('#connStatusPopover'),
-            iconDiv: document.getElementById("controllerConnStatus")
-          });
-        }
-      } else {
-        document.querySelector('a[data-target="' + modalIdSelector + '"] > span').className = "fa fa-solid fa-question-circle";
-        createAlertElements("danger", resp["msg"]);
-        if (formElementId == "host-setup-form") {
-          updateStatusIcon({
-            statusMsg: resp["result"].toUpperCase(),
-            popoverDiv: $('#connStatusPopover'),
-            iconDiv: document.getElementById("hostConnStatus")
-          });
-        } else {
-          updateStatusIcon({
-            statusMsg: resp["result"].toUpperCase(),
-            popoverDiv: $('#connStatusPopover'),
-            iconDiv: document.getElementById("controllerConnStatus")
-          });
-        }
-      }
-    });
-    // Define what happens in case of error
-    modalXHR.addEventListener("error", (event) => {
-      alert('Oops! Something went wrong.');
-    });
-    // Set up our request
-    modalXHR.open("POST", formUrl);
-    // The data sent is what the user provided in the form
-    modalXHR.setRequestHeader("Content-Type", 'application/json');
-    modalXHR.send(JSON.stringify(data));
-  }
-  // Get the form element
-  const form = document.getElementById(formElementId);
-  // Add 'submit' event handler
-  form.addEventListener("submit", (event) => {
+    // Get the form element
+    const form = document.getElementById(formElementId);
+    let formObj = {};
+
+    // Add 'submit' event handler
+    form.addEventListener("submit", (event) => {
     event.preventDefault();
     // add all form inputs and their values to a json object to be sent
-    var formObj = {};
     for (let i = 0; i < form.elements.length; i++) {
         if (form.elements[i].tagName !== 'BUTTON') {
             formObj[form.elements[i].id] = form.elements[i].value;
         }
     }
-    sendData(formObj);
-  });
-};
+    form.reset();
+    sendJSONFormData();
+    })
+
+    function sendJSONFormData() {
+        const modalXHR = new XMLHttpRequest();
+
+        // Define what happens on successful data submission
+        modalXHR.addEventListener("load", (event) => {
+          var modalIdSelector = "#" + formElementId.replace('-form','-modal');
+          $(modalIdSelector).modal('hide');
+          let resp = JSON.parse(modalXHR.responseText);
+          if (resp['result'] == 'success') {
+            document.querySelector('a[data-target="' + modalIdSelector + '"] > span').className = "fa fa-solid fa-check-circle";
+            createAlertElements("success", resp["msg"]);
+            if (formElementId == "host-setup-form") {
+              updateStatusIcon({
+                statusMsg: "READY",
+                popoverDiv: $('#connStatusPopover'),
+                iconDiv: document.getElementById("hostConnStatus")
+              });
+            } else {
+              updateStatusIcon({
+                statusMsg: "READY",
+                popoverDiv: $('#connStatusPopover'),
+                iconDiv: document.getElementById("controllerConnStatus")
+              });
+            }
+          } else {
+            document.querySelector('a[data-target="' + modalIdSelector + '"] > span').className = "fa fa-solid fa-question-circle";
+            createAlertElements("danger", resp["msg"]);
+            if (formElementId == "host-setup-form") {
+              updateStatusIcon({
+                statusMsg: resp["result"].toUpperCase(),
+                popoverDiv: $('#connStatusPopover'),
+                iconDiv: document.getElementById("hostConnStatus")
+              });
+            } else {
+              updateStatusIcon({
+                statusMsg: resp["result"].toUpperCase(),
+                popoverDiv: $('#connStatusPopover'),
+                iconDiv: document.getElementById("controllerConnStatus")
+              });
+            }
+          }
+        });
+
+        // Define what happens in case of error
+        modalXHR.addEventListener("error", (event) => {
+          alert('Oops! Something went wrong.');
+        });
+
+        // Set up our request
+        modalXHR.open("POST", formUrl);
+
+        // The data sent is what the user provided in the form
+        modalXHR.setRequestHeader("Content-Type", 'application/json');
+        modalXHR.send(JSON.stringify(formObj));
+    }
+}
 
 function fanCalibrationHandler(requestURL, fanId) {
     // Confirmation window

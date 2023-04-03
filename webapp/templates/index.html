@@ -110,7 +110,7 @@
 $(function() {
   modalFormHandler("host-setup-form", "{{ get_url('setup.truenas') }}");
   modalFormHandler("controller-setup-form", "{{ get_url('setup.controller') }}");
-  getConsolePortOptions('#console_port', '{{ get_url('setup.controller') }}
+  getConsolePortOptions("#console_port", "{{ get_url('setup.controller') }}");
 });
 </script>
 {% endblock %}
