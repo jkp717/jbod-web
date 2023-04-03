@@ -518,6 +518,12 @@ class AlertView(JBODBaseView):
 
     @expose('/delete/<alert_id>', methods=['POST', 'DELETE'])
     def delete_alert(self, alert_id):
+        if str(alert_id).upper() == 'ALL':
+            alerts = db.session.query(Alert).all()
+            for alert in alerts:
+                db.session.delete(alert)
+            db.session.commit()
+            return jsonify({"result": "success"}), 200
         alert = helpers.get_model_by_id(Alert, int(alert_id))
         if not alert:
             return jsonify({"result": "error", "msg": f"alert {alert_id} not found."}), 400
