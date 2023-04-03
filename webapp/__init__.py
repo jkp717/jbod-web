@@ -138,7 +138,7 @@ def create_app(dev=False):
     # setup apscheduler and event listeners
     jobs.scheduler.start()
     # add helper job to keep track of controller states
-    jobs.scheduler.add_job('_poll_controller_data', func="ipmi.jobs:_poll_controller_data",
+    jobs.scheduler.add_job('_poll_controller_data', func="webapp.jobs:_poll_controller_data",
                            trigger='interval', seconds=30)
     jobs.scheduler.add_listener(jobs.ev.job_missed_listener, EVENT_JOB_MISSED)
     jobs.scheduler.add_listener(jobs.ev.job_error_listener, EVENT_JOB_ERROR)
