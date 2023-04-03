@@ -173,6 +173,17 @@
   cursor: pointer;
 }
 
+.navbar-sidebar > .navbar-sidebar-content > .sidebar-subtext-link {
+    cursor: pointer;
+    text-align: center;
+    width: 100%;
+    display: inline-block;
+    font-size: .8rem;
+    font-style: italic;
+    color: royalblue;
+}
+}
+
 .navbar-popover > a:hover {
     color: unset;
     text-decoration: unset;
