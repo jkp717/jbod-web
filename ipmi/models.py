@@ -260,6 +260,7 @@ class Controller(db.Model):
     alive = db.Column(db.Boolean, default=False)
     fans = db.relationship('Fan', back_populates='controller', cascade="all, delete-orphan")
     chassis = db.relationship('Chassis', back_populates='controller', uselist=False)
+    last_ds2 = db.Column(db.DateTime)  # last time the controller responded to a ds2 request
     create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
     __table_args__ = (
@@ -285,6 +286,7 @@ class Fan(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     controller_id = db.Column(db.Integer, db.ForeignKey("controller.id"))
     port_num = db.Column(db.Integer)
+    description = db.Column(db.String)
     pwm = db.Column(db.Integer, default=100)
     rpm = db.Column(db.Integer, default=0)
     max_rpm = db.Column(db.Integer)

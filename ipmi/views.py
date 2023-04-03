@@ -1,5 +1,4 @@
 import uuid
-
 import serial
 from flask import current_app, jsonify, request, redirect, flash, Markup
 from flask_admin import expose, BaseView
@@ -12,11 +11,11 @@ from wtforms.widgets import PasswordInput
 from requests.exceptions import MissingSchema
 from serial.tools.list_ports import comports
 
-from ipmi import helpers
-from ipmi.models import db, PhySlot, FanSetpoint, Fan, Controller, SysConfig, Chassis, SysJob, Alert
-from ipmi.jobs import scheduler, query_disk_properties, query_controller_properties, \
-    truenas_connection_info, get_console, ping_controllers, console_connection_check, sound_controller_alarm
-from ipmi.jobs.events import fan_calibration_job_listener
+from webapp import helpers
+from webapp.models import db, PhySlot, FanSetpoint, Fan, Controller, SysConfig, Chassis, SysJob, Alert
+from webapp.jobs import scheduler, query_disk_properties, query_controller_properties, \
+    truenas_connection_info, get_console, ping_controllers, console_connection_check
+from webapp.jobs.events import fan_calibration_job_listener
 
 
 class JBODBaseView(ModelView):
@@ -120,15 +119,6 @@ class NewSetupView(BaseView):
         return False
 
 
-# class TestView(BaseView):
-#     @expose('/')
-#     def index(self):
-#         print("writing test started")
-#         tty = get_console()
-#         tty.transmit(b'\x13\x00test message\x00\r\n')
-#         return "Sent..."
-
-
 class SysConfigView(JBODBaseView):
     column_exclude_list = JBODBaseView.column_exclude_list + ['encrypt']
     column_editable_list = ['value', 'encrypt']
@@ -144,7 +134,7 @@ class SysConfigView(JBODBaseView):
             tty = get_console()
             if tty:
                 if model.value is None:
-                    tty.close()   # TODO: not sure if needed? Should test.
+                    tty.close()
                 elif model.key == 'console_port':
                     tty.change_port(model.value)
                 elif model.key == 'baud_rate':
@@ -163,6 +153,7 @@ class FanView(JBODBaseView):
     column_exclude_list = JBODBaseView.column_exclude_list + [
         'calibration_job_uuid', 'calibration_status'
     ]
+    column_editable_list = ['description']
     form_excluded_columns = JBODBaseView.form_excluded_columns + [
         'setpoints', 'rpm', 'active', 'four_pin', 'port_num', 'controller', 'min_rpm', 'max_rpm',
         'calibration_job_uuid', 'calibration_status', 'pwm', 'rpm_deviation'
@@ -391,14 +382,14 @@ class ControllerView(JBODBaseView):
     # can_create = False
     can_create = True
     can_edit = False
-    refresh_view = '.ping'
+    refresh_view = '.broadcast'
     list_template = 'refresh_list.html'
     column_list = ['id', 'mcu_device_id', 'firmware_version', 'fan_port_cnt', 'psu_on', 'alive']
     column_formatters = {'id': helpers.controller_id_formatter}
     column_extra_row_actions = [helpers.ControllerAlarmRowAction()]
 
     def get_empty_list_message(self):
-        return Markup(f"<a href={self.get_url('.ping')}>Search for connected Controllers</a>")
+        return Markup(f"<a href={self.get_url('.broadcast')}>Search for connected Controllers</a>")
 
     def on_model_delete(self, model):
         if model.chassis:
@@ -414,6 +405,10 @@ class ControllerView(JBODBaseView):
 
     @expose('/alarm/<controller_id>', methods=['GET'])
     def alarm(self, controller_id):
+        """
+        Called by row action; schedules job to toggle
+        alarm on for 3 seconds.
+        """
         job_uuid = uuid.uuid4()
         calibration_job = {
             "id": str(job_uuid),
@@ -427,8 +422,19 @@ class ControllerView(JBODBaseView):
         flash(f"Triggering alarm sound on controller {controller_id}...")
         return redirect(self.get_url('.index_view'))
 
-    @expose('/ping', methods=['GET'])
-    def ping(self):
+    @expose('/alive', methods=['GET'])
+    def alive(self):
+        """
+        Simple route to return True/False if controllers are alive
+        """
+        return jsonify({'alive': console_connection_check()})
+
+    @expose('/broadcast', methods=['GET'])
+    def broadcast(self):
+        """
+        Broadcasts out to serial port looking for new controllers.
+        Returns either json or HTML based on request type.
+        """
         if not request.args.get('id'):
             controllers = db.session.query(Controller).all()
             # send out ping to controller group (looks for new controllers)

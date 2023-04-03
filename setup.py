@@ -16,7 +16,8 @@ setup(
         'flask_sqlalchemy',
         'cryptography',
         'sqlalchemy',
-        'wtforms'
+        'wtforms',
+        'python-dotenv'
     ],
 )
 

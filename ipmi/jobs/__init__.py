@@ -1,15 +1,16 @@
 import time
 import json
+from datetime import datetime, timedelta
 from typing import Optional, Union
 from flask import current_app
 from sqlalchemy.sql import text
 from flask_apscheduler import APScheduler
 from serial import SerialException, serial_for_url
-from ipmi.models import db, SysConfig, Disk, DiskTemp, Chassis, Fan, FanSetpoint, Controller, PhySlot
-from ipmi.console import JBODCommand, JBODConsole, JBODConsoleException, JBODRxData
-from ipmi import helpers
-from ipmi.jobs import events as ev
-from ipmi.config import MIN_FAN_PWM, MAX_FAN_PWM
+from webapp.models import db, SysConfig, Disk, DiskTemp, Chassis, Fan, FanSetpoint, Controller, PhySlot, SysJob
+from webapp.console import JBODCommand, JBODConsole, JBODConsoleException, JBODRxData, ResetEvent
+from webapp import helpers
+from webapp.jobs import events as ev
+from webapp.config import MIN_FAN_PWM, MAX_FAN_PWM
 
 
 scheduler = APScheduler()
@@ -44,7 +45,12 @@ def get_console() -> Union[JBODConsole, None]:
 def console_connection_check():
     tty = get_console()
     if tty is not None:
-        return tty.serial.is_open
+        if not tty.serial.is_open:
+            return False
+        controllers = db.session.query(Controller).all()
+        # return true if all controllers in db show 'alive'
+        if controllers:
+            return len(controllers) == len([c for c in controllers if c.alive])
     return False
 
 
@@ -220,12 +226,12 @@ def ping_controllers(controller_id: Optional[int] = None) -> Union[list[dict], l
             # continue to loop until either NAK or no response
             dev_id = None
             try:
+                # using DEVICE_ID rather than PING to get mcu id from response
                 dev_id = tty.command_write(JBODCommand.DEVICE_ID, next_id)
                 resp.append({"id": next_id, "mcu_device_id": str(dev_id.data)})
             except JBODConsoleException:
-                if next_id == 1:
-                    current_app.logger.error(f"Controller on {tty.serial.port} did not respond to ID request. "
-                                             f"RX: {dev_id}")
+                if next_id == 1 or next_id == controller_id:
+                    current_app.logger.error(f"Controller on {tty.serial.port} did not respond to ID request.")
                 break
             if next_id == controller_id:
                 break
@@ -277,12 +283,29 @@ def poll_controller_data() -> None:
     callback (ds2 messages).
     """
     with scheduler.app.app_context():
-        with scheduler.app.app_context():
-            tty = get_console()
-            if not tty.serial.is_open:
-                raise SerialException("Serial connection not established.")
-            # controller responds to DC2 requests with json-like object
-            tty.transmit(tty.ctrlc.DC2)
+        tty = get_console()
+        if not tty.serial.is_open:
+            raise SerialException("Serial connection not established.")
+        # controller responds to DC2 requests with json-like object
+        tty.transmit(tty.ctrlc.DC2)
+
+
+def _poll_controller_data() -> None:
+    """
+    Job to verify controller(s) is responding to poll_controller_data.
+    Updates controllers 'alive' to false if no response is received within
+    2x of poll_controller_data scheduled runtime interval.
+    """
+    with scheduler.app.app_context():
+        job = db.session.query(SysJob).where(SysJob.job_id == 'poll_controller_data').first()
+        if job is None:
+            return None
+        if job.active is False:
+            return None
+        ctrlr = db.session.query(Controller).all()
+        for c in ctrlr:
+            c.alive = c.last_ds2 >= datetime.utcnow() - timedelta(seconds=job.seconds*2, minutes=job.minutes*2)
+            db.session.commit()
 
 
 def fan_calibration(fan_id: int) -> None:
@@ -417,26 +440,29 @@ def console_callback(tty: JBODConsole, rx: JBODRxData):
             try:
                 resp = json.loads(rx.data.strip("\r\n"))
                 ctrlr = db.session.query(Controller).where(Controller.mcu_device_id == resp['mcu']).first()
+                data = resp['data']
+
+                # record the timestamp of this response
+                ctrlr.last_ds2 = datetime.datetime.utcnow()
+                db.session.commit()
 
                 # update psu status if needed
-                if (ctrlr.psu_on == True and resp['psu'] != "ON") or (ctrlr.psu_on == False and resp['psu'] == "ON"):
-                    ctrlr.psu_on = resp['psu'] == "ON"
+                if (ctrlr.psu_on == True and data['psu'] != "ON") or (ctrlr.psu_on == False and data['psu'] == "ON"):
+                    ctrlr.psu_on = data['psu'] == "ON"
                     scheduler.app.logger.info("psu status for %s updated to %s", ctrlr.mcu_device_id, ctrlr.psu_on)
                     db.session.commit()
 
                 # update fan(s) rpm and pwm values
-                for i, rpm in enumerate(resp['data']['rpm']):
-                    fan = db.session.query(Fan).where(Fan.controller_uuid == ctrlr.id, Fan.port_num == i+1).first()
+                for i, rpm in enumerate(data['rpm']):
+                    fan = db.session.query(Fan).where(Fan.controller_id == ctrlr.id, Fan.port_num == i+1).first()
                     if not fan:
                         scheduler.app.logger.warning("Unable to find associated fan for rpm data: %s", rx)
                     else:
-                        fan.pwm = resp['data']['pwm'][i]
-                        # remove noise by only recording changes +/- 50 rpm
-                        if fan.rpm in range(int(rpm)-50, int(rpm)+50):
-                            fan.rpm = int(rpm)
-                            fan.rpm_deviation = helpers.fan_rpm_deviation(fan)
-                            scheduler.app.logger.debug("Stored fan[%s] rpm: %s; Deviation: %s",
-                                                       fan.id, fan.rpm, fan.rpm_deviation)
+                        fan.pwm = data['pwm'][i]
+                        fan.rpm = int(rpm)
+                        fan.rpm_deviation = helpers.fan_rpm_deviation(fan)
+                        scheduler.app.logger.debug("Stored fan[%s] rpm: %s; Deviation: %s",
+                                                   fan.id, fan.rpm, fan.rpm_deviation)
                         db.session.commit()
             except Exception:  # noqa
                 scheduler.app.logger.error("Unable to parse controller data: %s", rx)
@@ -444,7 +470,7 @@ def console_callback(tty: JBODConsole, rx: JBODRxData):
             # misc controller event messages
             msg_type, msg_body = rx.data.split(":")[0], rx.data.split(":")[1]
             if msg_type == 'reset_event':
-                rst_code = helpers.ResetEvent(int(msg_body)).name
+                rst_code = ResetEvent(int(msg_body)).name
                 scheduler.app.logger.warning("Controller reset event: %s", rst_code)
             else:
                 scheduler.app.logger.warning("Unknown ds4 event message received: %s", rx)

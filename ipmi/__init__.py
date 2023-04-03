@@ -11,7 +11,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from apscheduler.events import EVENT_JOB_MISSED, EVENT_JOB_ERROR, EVENT_JOB_EXECUTED, EVENT_JOB_ADDED, \
     EVENT_JOB_REMOVED, EVENT_JOB_SUBMITTED
 
-from ipmi.config import config_defaults, scheduler_jobs
+from webapp.config import config_defaults, scheduler_jobs
 
 
 # run the following to start server
@@ -20,8 +20,8 @@ from ipmi.config import config_defaults, scheduler_jobs
 
 def setup_flask_admin(app_instance, session):
 
-    from ipmi import models as mdl
-    from ipmi import views as vw
+    from webapp import models as mdl
+    from webapp import views as vw
 
     admin = Admin(
         name='JBOD',
@@ -29,7 +29,6 @@ def setup_flask_admin(app_instance, session):
         base_template='jbod_base.html'
     )
     admin.init_app(app_instance, index_view=vw.IndexView(name='Home', url='/'))
-    # admin.add_view(vw.TestView(endpoint='test'))
     admin.add_view(vw.DiskView(mdl.Disk, session))
     admin.add_view(vw.ChassisView(mdl.Chassis, session))
     admin.add_view(vw.ControllerView(mdl.Controller, session))
@@ -69,35 +68,23 @@ def generate_key(salt, token) -> Fernet:
     return Fernet(key)
 
 
-def create_app(test_config=None):
+def create_app(dev=False):
     # create and configure the app
-    app = Flask(__name__, instance_relative_config=True)
+    app = Flask(__name__)
     app.jinja_env.trim_blocks = True
-    app.config.from_mapping(
-        DEBUG=True,
-        TESTING=True,
-        SCHEDULER_API_ENABLED=True,
-        SECRET_KEY='y2ruDSrohycg8PA9YO1Vtjt5s7fdDakM5giqBgNKHGs=',
-        SECRET_KEY_SALT=b'\x1c_\xd3\\z\xedf\xe4\xe6Y\x9az\x05\xbf7\xdf',
-        FLASK_ADMIN_FLUID_LAYOUT=True,
-        SQLALCHEMY_DATABASE_URI="sqlite:///%s" % os.path.normpath(os.path.join(app.instance_path, 'ipmi.db')),
-        SCHEDULER_JOBS=[],  # APScheduler Jobs
-    )
-    if test_config is None:
-        # load the instance config, if it exists, when not testing
-        app.config.from_pyfile('config.py', silent=True)
+    if not dev:
+        app.config.from_object('config.ProdConfig')
     else:
-        # load the test config if passed in
-        app.config.from_mapping(test_config)
+        app.config.from_object('config.DevConfig')
     # ensure the instance folder exists
     try:
         os.makedirs(app.instance_path)
     except OSError:
         pass
 
-    from ipmi import jobs
-    from ipmi.models import db, SysConfig, SysJob, Alert
-    from ipmi import helpers
+    from webapp import jobs
+    from webapp.models import db, SysConfig, SysJob, Alert
+    from webapp import helpers
 
     # initialize flask addons
     db.init_app(app)
@@ -150,6 +137,9 @@ def create_app(test_config=None):
 
     # setup apscheduler and event listeners
     jobs.scheduler.start()
+    # add helper job to keep track of controller states
+    jobs.scheduler.add_job('_poll_controller_data', func="ipmi.jobs:_poll_controller_data",
+                           trigger='interval', seconds=30)
     jobs.scheduler.add_listener(jobs.ev.job_missed_listener, EVENT_JOB_MISSED)
     jobs.scheduler.add_listener(jobs.ev.job_error_listener, EVENT_JOB_ERROR)
     jobs.scheduler.add_listener(jobs.ev.job_executed_listener, EVENT_JOB_EXECUTED)
@@ -163,6 +153,5 @@ def create_app(test_config=None):
     app.jinja_env.globals.update(disk_tooltip_html=helpers.disk_tooltip_html)
     app.jinja_env.globals.update(svg_html_converter=helpers.svg_html_converter)
     app.jinja_env.globals.update(get_alerts=helpers.get_alerts)
-    # app.jinja_env.globals.update(debug=debug)
     return app
 

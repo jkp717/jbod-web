@@ -65,6 +65,7 @@ class JBODCommand(Enum):
     FAN_CNT = "jbod/? fans"  # Get count of fans supported
     DEVICE_ID = "jbod/? id"
     FIRMWARE_VERSION = "jbod/? version"
+    PING = "jbod/? ping"  # responds with ack & 'OK'
 
 
 class JBODControlCharacter(Enum):
@@ -159,13 +160,12 @@ class JBODRxData:
         for prop in ['ack', 'xon', 'xoff', 'dc2', 'dc4']:
             self.__setattr__(prop, d[0].encode(self.ENCODING))
         try:
-            # self._data = d[1].encode(self.ENCODING)
             self._data = d[1]
         except IndexError:
             self._data = None
 
     def __repr__(self):
-        return f"JBODRxData(ack={self.ack},xon={self.xon},xoff={self.xoff},dc2={self.dc2},dc4={self.dc4}" \
+        return f"JBODRxData(ack={self.ack},xon={self.xon},xoff={self.xoff},dc2={self.dc2},dc4={self.dc4}," \
                f"data={self.data},raw_data={self.raw_data})"
 
 
@@ -174,7 +174,6 @@ class JBODConsole:
     ENCODING = 'ASCII'
     NEW_RX_DATA = False
     NEW_TX_DATA = False
-    TESTING = False
 
     def __init__(self, serial_instance: serial.Serial, callback: Optional[callable] = None, **kwargs):
         self.cmd = JBODCommand
@@ -401,30 +400,7 @@ class JBODConsole:
                 # restore settings and open
                 new_serial.applySettingsDict(settings)
                 self.serial = new_serial
-                self.start()
+                self.start()  # opens the port
             except serial.SerialException as e:
                 self.serial.close()
                 raise e
-
-
-ack_tests = {
-    re.compile(r"jbod/1 pwm fan/\d \d{2}"): "\x06\x00\r\n".encode('ASCII'),
-    re.compile(r"jbod/2 pwm \d{2}"): "\x06\x00\r\n".encode('ASCII'),
-    "\x12".encode("ASCII"): "\x12\x00{466-2038344B513050-19-1003:[1100,2000,1900,2000]}\x00\r\n\x12\x00{466-2038344B513040-20-1004:[1200,2300,2200,0]}\x00\r\n".encode('ASCII'),
-    "jbod/1 id\r\n".encode("ASCII"): "\x06\x00466-2038344B513050-19-1003\x00\r\n".encode('ASCII'),
-    "jbod/2 id\r\n".encode("ASCII"): "\x06\x00466-2038344B513040-20-1004\x00\r\n".encode('ASCII'),
-    "jbod/1 fans\r\n".encode("ASCII"): "\x06\x004\x00\r\n".encode("ASCII"),
-    "jbod/2 fans\r\n".encode("ASCII"): "\x06\x004\x00\r\n".encode("ASCII"),
-    "jbod/1 version\r\n".encode("ASCII"): "\x06\x00v2.0.0\x00\r\n".encode("ASCII"),
-    "jbod/2 version\r\n".encode("ASCII"): "\x06\x00v2.0.0\x00\r\n".encode("ASCII"),
-    "jbod/1 rpm fan/1\r\n".encode("ASCII"): "\x06\x002000\x00\r\n".encode('ASCII'),
-    "jbod/1 rpm fan/2\r\n".encode("ASCII"): "\x06\x002050\x00\r\n".encode('ASCII'),
-    "jbod/1 rpm fan/3\r\n".encode("ASCII"): "\x06\x000\x00\r\n".encode('ASCII'),
-    "jbod/1 rpm fan/4\r\n".encode("ASCII"): "\x06\x001540\x00\r\n".encode('ASCII'),
-    "jbod/2 rpm fan/1\r\n".encode("ASCII"): "\x06\x002000\x00\r\n".encode('ASCII'),
-    "jbod/2 rpm fan/2\r\n".encode("ASCII"): "\x06\x002050\x00\r\n".encode('ASCII'),
-    "jbod/2 rpm fan/3\r\n".encode("ASCII"): "\x06\x000\x00\r\n".encode('ASCII'),
-    "jbod/2 rpm fan/4\r\n".encode("ASCII"): "\x06\x001540\x00\r\n".encode('ASCII'),
-    "jbod/1 psu status\r\n".encode("ASCII"): "\x06\x00ON\x00\r\n".encode('ASCII'),
-    "jbod/2 psu status\r\n".encode("ASCII"): "\x06\x00ON\x00\r\n".encode('ASCII'),
-}

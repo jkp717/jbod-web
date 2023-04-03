@@ -61,6 +61,9 @@ $(function () {
     content: document.querySelector('#connStatusPopover > .popover-container').innerHTML,
     html: true
   });
+
+  // sets up 5 sec polling for console status
+  pollConsoleStatus("{{ get_url('controller.alive') }}", 5000);
 });
 </script>
 {% endblock %}

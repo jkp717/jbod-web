@@ -1,6 +1,6 @@
 import logging
-from ipmi import helpers, jobs
-from ipmi.models import db, Fan
+from webapp import helpers, jobs
+from webapp.models import db, Fan
 
 
 def fan_calibration_job_listener(event):

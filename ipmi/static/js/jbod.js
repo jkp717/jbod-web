@@ -107,7 +107,7 @@ function deleteAlert(event, alertId, deleteAlertUrl) {
     success: function(result) {
         $(event).parent().parent().hide("fast");  // animation hiding element
         $(event).parent().parent().remove();  // removal of actual li element
-        if ($('#alertSidebar > .navbar-sidebar-content > ul').find("li").length !== 0) {
+        if ($('#alertSidebar > .navbar-sidebar-content > ul').find("li").length > 0) {
             $('#alertSidebar').addClass("navbar-popover-alert");
         } else {
             $('#alertSidebar').removeClass("navbar-popover-alert");
@@ -129,6 +129,33 @@ function getConsolePortOptions(selectElem, portOptionsUrl) {
             }));
         });
     }
+    });
+}
+
+function pollConsoleStatus(pollUrl, pollInterval) {
+    const iconDiv = document.getElementById("controllerConnStatus");
+    $.ajax({
+        url: pollUrl,
+        type: 'GET',
+        success: function(result) {
+            // update if showing disconnected but controller is alive
+            if ($(iconDiv).hasClass('disconnected') && result.alive) {
+                updateStatusIcon({
+                    statusMsg: "READY",
+                    popoverDiv: $('#connStatusPopover'),
+                    iconDiv: iconDiv
+                });
+            // update if showing READY but controller is not alive
+            } else if (!($(iconDiv).hasClass('disconnected')) && result.alive) {
+                updateStatusIcon({
+                    statusMsg: "DEAD",
+                    popoverDiv: $('#connStatusPopover'),
+                    iconDiv: iconDiv
+                });
+            }
+            // must be inside response callback function
+            setTimeout(function() { pollConsoleStatus(pollUrl, pollInterval) }, pollInterval);
+        }
     });
 }
 
