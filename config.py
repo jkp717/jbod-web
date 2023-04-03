@@ -23,8 +23,10 @@ class Config:
 class DevConfig(Config):
     DEBUG = True
     TESTING = True
+    SERIAL_DEBUG = True
 
 
 class ProdConfig(Config):
     DEBUG = False
     TESTING = False
+    SERIAL_DEBUG = False

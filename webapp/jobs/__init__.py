@@ -24,6 +24,8 @@ def get_console() -> Union[JBODConsole, None]:
                 # set console to None if port is not provided
                 current_app.__setattr__('console', None)
                 return None
+            if current_app.config['SERIAL_DEBUG']:
+                port = f"spy:///{port}?file=serial.log"
             try:
                 tty = JBODConsole(
                     serial_for_url(
@@ -39,7 +41,7 @@ def get_console() -> Union[JBODConsole, None]:
                 # store JBODConsole instance as app attr
                 current_app.__setattr__('console', None)
                 current_app.logger.error(err)
-    return getattr(current_app, 'console', None)
+    return getattr(current_app, 'console')
 
 
 def console_connection_check():
@@ -226,14 +228,13 @@ def ping_controllers(controller_id: Optional[int] = None) -> Union[list[dict], l
         tty = get_console()
         while True:
             # continue to loop until either NAK or no response
-            dev_id = None
             try:
                 # using DEVICE_ID rather than PING to get mcu id from response
                 dev_id = tty.command_write(JBODCommand.DEVICE_ID, next_id)
                 resp.append({"id": next_id, "mcu_device_id": str(dev_id.data)})
-            except JBODConsoleException:
-                if next_id == 1 or next_id == controller_id:
-                    current_app.logger.error(f"Controller on {tty.serial.port} did not respond to ID request.")
+            except JBODConsoleException as err:
+                if next_id == 1:
+                    current_app.logger.error(f"Controller on {tty.serial.port} did not respond to ID request. {err}")
                 break
             if next_id == controller_id:
                 break
