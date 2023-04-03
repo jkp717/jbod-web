@@ -72,6 +72,14 @@ def create_app(dev=False):
     # create and configure the app
     app = Flask(__name__)
     app.jinja_env.trim_blocks = True
+
+    # create a .env if one doesn't already exist
+    basedir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+    if not os.path.exists(os.path.join(basedir, '.env')):
+        with open(os.path.join(basedir, '.env'), 'w') as f:
+            f.write(f"SECRET_KEY={Fernet.generate_key().decode()}\n")
+            f.write(f"SECRET_KEY_SALT={base64.b64encode(os.urandom(16)).decode()}\n")
+
     if not dev:
         app.config.from_object('config.ProdConfig')
     else:
