@@ -17,7 +17,7 @@
           {% endif %}
           Setup TrueNAS API connection
         </a>
-        <a href="#" class="list-group-item list-group-item-action" data-toggle="modal" data-target="#controller-setup-modal" onclick="getConsolePortOptions('#console_port', '{{ get_url('setup.controller') }}');">
+        <a href="#" class="list-group-item list-group-item-action" data-toggle="modal" data-target="#controller-setup-modal">
           {% if setup_required.controller %}
           <span class="fa fa-solid fa-check-circle" style="padding-right: 20px;"></span>
           {% else %}
@@ -110,6 +110,7 @@
 $(function() {
   modalFormHandler("host-setup-form", "{{ get_url('setup.truenas') }}");
   modalFormHandler("controller-setup-form", "{{ get_url('setup.controller') }}");
+  getConsolePortOptions('#console_port', '{{ get_url('setup.controller') }}
 });
 </script>
 {% endblock %}
