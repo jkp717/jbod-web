@@ -484,11 +484,11 @@ class ControllerView(JBODBaseView):
                 flash_msg += "Database updated."
         elif len(new_c) > 0:
             flash_msg += Markup(f"""
-            <a href="{self.get_url('.ping', action='add')}" class="alert-link">Add new controller?</a>
+            <a href="{self.get_url('.broadcast', action='add')}" class="alert-link">Add new controller?</a>
             """)
         elif len(dead_c) > 0:
             flash_msg += Markup(f"""
-            <a href="{self.get_url('.ping', action='delete')}" class="alert-link">Remove controller?</a>
+            <a href="{self.get_url('.broadcast', action='delete')}" class="alert-link">Remove controller?</a>
             """)
         else:
             flash_msg += f"{len(ack_c)} controllers responded. No changes needed."
