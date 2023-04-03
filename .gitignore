@@ -3,3 +3,4 @@
 /tests
 /instance/ipmi.db
 ipmi.log*
+/.env

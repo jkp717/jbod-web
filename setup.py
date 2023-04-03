@@ -19,6 +19,7 @@ setup(
         'wtforms',
         'python-dotenv'
     ],
+    scripts=['scripts/setup_env.py', ]
 )
 
 # run 'python setup.py install'
