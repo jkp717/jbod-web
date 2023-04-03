@@ -51,6 +51,8 @@ def console_connection_check():
         # return true if all controllers in db show 'alive'
         if controllers:
             return len(controllers) == len([c for c in controllers if c.alive])
+        # No controllers are avail on initial setup so just check for open serial port
+        return True
     return False
 
 
