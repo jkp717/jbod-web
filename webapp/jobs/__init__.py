@@ -342,7 +342,7 @@ def fan_calibration(fan_id: int) -> None:
             original_rpm = int(r.data)
         else:
             original_rpm = fan_model.rpm
-        original_pwm = fan_model.pwm if fan_model.pwm != 0 else DEFAULT_FAN_PWM
+        original_pwm = fan_model.pwm if MIN_FAN_PWM < fan_model.pwm < MAX_FAN_PWM else DEFAULT_FAN_PWM
         _logger.debug(f"fan_calibration: initial values; rpm={original_rpm}; pwm={original_pwm}")
         tty.command_write(JBODCommand.PWM, fan_model.controller_id, fan_model.id, MIN_FAN_PWM)
         # wait for rpm value to normalize
