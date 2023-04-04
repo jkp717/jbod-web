@@ -9,6 +9,9 @@ MAX_FAN_PWM = 99
 # Lowest supported value by most PWM fans
 MIN_FAN_PWM = 20
 
+# Value set when PWM is not provided
+DEFAULT_FAN_PWM = 50
+
 # configuration defaults
 config_defaults = {
     'timezone': 'America/Chicago',

@@ -10,7 +10,7 @@ from webapp.models import db, SysConfig, Disk, DiskTemp, Chassis, Fan, FanSetpoi
 from webapp.console import JBODCommand, JBODConsole, JBODConsoleException, JBODRxData, ResetEvent
 from webapp import helpers
 from webapp.jobs import events as ev
-from webapp.config import MIN_FAN_PWM, MAX_FAN_PWM
+from webapp.config import MIN_FAN_PWM, MAX_FAN_PWM, DEFAULT_FAN_PWM
 
 
 scheduler = APScheduler()
@@ -335,12 +335,13 @@ def fan_calibration(fan_id: int) -> None:
                             f"skipping fan_calibration.")
         # pwm fan‘s speed scales broadly linear with the duty-cycle of the PWM signal between
         # maximum speed at 100% PWM and the specified minimum speed at 20% PWM
-        if not fan_model.pwm:
+        if not fan_model.rpm:
             r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.id)
             original_rpm = int(r.data)
         else:
             original_rpm = fan_model.rpm
-        original_pwm = fan_model.pwm if fan_model.pwm < MAX_FAN_PWM else MAX_FAN_PWM
+        original_pwm = fan_model.pwm if fan_model.pwm != 0 else DEFAULT_FAN_PWM
+        scheduler.app.logger.debug(f"fan_calibration: initial values; rpm={original_rpm}; pwm={original_pwm}")
         tty.command_write(JBODCommand.PWM, fan_model.controller_id, fan_model.id, MIN_FAN_PWM)
         # wait for rpm value to normalize
         r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.id)
@@ -352,6 +353,8 @@ def fan_calibration(fan_id: int) -> None:
             r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.id)
             new_rpm = int(r.data)
             wait_secs += 1
+        scheduler.app.logger.debug(f"fan_calibration: min rpm normalization took {wait_secs} secs.  "
+                                   f"New min rpm value is {round(new_rpm, -2)}")
         # store new readings in min_rpm; round to the nearest 100th
         fan_model.min_rpm = round(new_rpm, -2)
         # Set fan to max PWM
@@ -364,8 +367,11 @@ def fan_calibration(fan_id: int) -> None:
         while abs(new_rpm - prev_rpm) > 100 or wait_secs >= max_wait_secs:
             time.sleep(1)
             prev_rpm = new_rpm
-            new_rpm = int(tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.id).data)
+            r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.id)
+            new_rpm = int(r.data)
             wait_secs += 1
+        scheduler.app.logger.debug(f"fan_calibration: max rpm normalization took {wait_secs} secs.  "
+                                   f"New min rpm value is {round(new_rpm, -2)}")
         fan_model.max_rpm = round(new_rpm, -2)
         # define four pin
         if fan_model.min_rpm in range(fan_model.max_rpm-100, fan_model.max_rpm+100):
@@ -373,6 +379,7 @@ def fan_calibration(fan_id: int) -> None:
         else:
             fan_model.four_pin = True
         # Set fan back to original PWM
+        scheduler.app.logger.debug("fan_calibration: Complete! Setting fan back to initial values.")
         tty.command_write(JBODCommand.PWM, fan_model.controller_id, fan_model.id, original_pwm)
         fan_model.rpm = original_rpm
         # commit changes to db

@@ -347,11 +347,8 @@ function checkCalibrationStatus(fanId) {
         const calStatCode = JSON.parse(XHR.responseText)['status'];
         const calStatMsg = JSON.parse(XHR.responseText)['message'];
         const progressBar = $('.calibration-progress-modal[data-fan="' + fanId + '"]').find( ".progress-bar" );
-        if (calStatCode == 2 && cntAttempts <= 7) {
-            console.log("trying again...");
+        if (calStatCode == 2 && cntAttempts <= 10) {
             ++cntAttempts;// still running
-            console.log("current width: " +  progressBar.width());
-            console.log("widening bar by " + "+=" + Math.round(progressBar.parent().width() * 0.1) + "px");
             progressBar.animate(
                 {
                   width: "+=" + Math.round(progressBar.parent().width() * 0.1) + "px"
@@ -365,7 +362,6 @@ function checkCalibrationStatus(fanId) {
                 }
             );
         } else {
-            console.log("final width: " + "+=" + Math.round(progressBar.parent().width() - progressBar.width()) + "px");
             progressBar.animate(
                 {
                   width: "+=" + Math.round(progressBar.parent().width() - progressBar.width()) + "px"
