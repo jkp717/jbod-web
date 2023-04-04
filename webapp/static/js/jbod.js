@@ -347,7 +347,7 @@ function checkCalibrationStatus(fanId) {
         const calStatCode = JSON.parse(XHR.responseText)['status'];
         const calStatMsg = JSON.parse(XHR.responseText)['message'];
         const progressBar = $('.calibration-progress-modal[data-fan="' + fanId + '"]').find( ".progress-bar" );
-        if (calStatCode == 2 && cntAttempts <= 10) {
+        if (calStatCode == 2 && cntAttempts <= 15) {
             ++cntAttempts;// still running
             progressBar.animate(
                 {

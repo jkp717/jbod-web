@@ -349,14 +349,15 @@ def fan_calibration(fan_id: int) -> None:
         r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.id)
         new_rpm = int(r.data)
         prev_rpm = 0
-        while abs(new_rpm - prev_rpm) > 100 or wait_secs >= max_wait_secs:
+        while abs(new_rpm - prev_rpm) > 100 and wait_secs <= max_wait_secs:
             time.sleep(1)
             prev_rpm = new_rpm
             r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.id)
+            _logger.debug(f"fan_calibration: min_pwm loop: rpm value: {int(r.data)}")
             new_rpm = int(r.data)
             wait_secs += 1
         _logger.debug(f"fan_calibration: min rpm normalization took {wait_secs} secs.  "
-                                   f"New min rpm value is {round(new_rpm, -2)}")
+                      f"New min rpm value is {round(new_rpm, -2)}")
         # store new readings in min_rpm; round to the nearest 100th
         fan_model.min_rpm = round(new_rpm, -2)
         # Set fan to max PWM
@@ -366,14 +367,14 @@ def fan_calibration(fan_id: int) -> None:
         r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.id)
         new_rpm = int(r.data)
         wait_secs = 0
-        while abs(new_rpm - prev_rpm) > 100 or wait_secs >= max_wait_secs:
+        while abs(new_rpm - prev_rpm) > 100 and wait_secs <= max_wait_secs:
             time.sleep(1)
             prev_rpm = new_rpm
             r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.id)
             new_rpm = int(r.data)
             wait_secs += 1
         _logger.debug(f"fan_calibration: max rpm normalization took {wait_secs} secs.  "
-                                   f"New min rpm value is {round(new_rpm, -2)}")
+                      f"New min rpm value is {round(new_rpm, -2)}")
         fan_model.max_rpm = round(new_rpm, -2)
         # define four pin
         if fan_model.min_rpm in range(fan_model.max_rpm-100, fan_model.max_rpm+100):
