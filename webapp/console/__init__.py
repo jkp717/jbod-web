@@ -139,7 +139,7 @@ class JBODRxData:
         for ctrlc in self.cc_mapper.keys():
             if bytearray(data).startswith(ctrlc):
                 self.set_flag(ctrlc)
-                self.data = bytearray(data).removeprefix(ctrlc).strip(b'\r\n')
+                self.data = bytearray(data).removeprefix(ctrlc).strip(b'\r\n\x00')
                 break
 
     def __repr__(self):

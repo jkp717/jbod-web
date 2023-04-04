@@ -254,7 +254,11 @@ def query_controller_properties(controller: Controller) -> Controller:
 
             # get total fan ports supported by controller
             fc = tty.command_write(JBODCommand.FAN_CNT, controller.id)
-            controller.fan_port_cnt = int(fc.data)
+            try:
+                controller.fan_port_cnt = int(fc.data)
+            except ValueError:
+                scheduler.app.logger.error(f"Received a non-integer value for fan_port_cnt: {fc}")
+                controller.fan_port_cnt = 0
 
             # get firmware version
             fw = tty.command_write(JBODCommand.FIRMWARE_VERSION, controller.id)
