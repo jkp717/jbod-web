@@ -1,4 +1,5 @@
 import time
+import logging
 import json
 from datetime import datetime, timedelta
 from typing import Optional, Union
@@ -14,6 +15,7 @@ from webapp.config import MIN_FAN_PWM, MAX_FAN_PWM, DEFAULT_FAN_PWM
 
 
 scheduler = APScheduler()
+_logger = logging.getLogger("apscheduler_jobs")
 
 
 def get_console() -> Union[JBODConsole, None]:
@@ -171,14 +173,14 @@ def poll_setpoints() -> None:
         jbods = db.session.query(Chassis).where(Chassis.controller_id != None).all()  # noqa
         # stop process if no chassis is defined
         if not jbods:
-            scheduler.app.logger.warning("No chassis defined, skipping job: poll_setpoints")
+            _logger.warning("No chassis defined, skipping job: poll_setpoints")
             return None
         # get disk temps grouped by chassis
         for jbod in jbods:
             disks = db.session.query(Disk).join(PhySlot).filter(PhySlot.chassis_id == jbod.id).all()
             # disks = db.session.query(Disk).where(Disk.chassis_id == jbod.id).all()
             if not disks:
-                scheduler.app.logger.warning("No disks assigned to chassis %s, %s", jbod.name, jbod.id)
+                _logger.warning("No disks assigned to chassis %s, %s", jbod.name, jbod.id)
                 continue
             fans = db.session.query(Fan).where(Fan.controller_id == jbod.controller.id).all()
             temp_agg = max([int(d.last_temp_reading) for d in disks if str(d.last_temp_reading).isnumeric()])
@@ -186,7 +188,7 @@ def poll_setpoints() -> None:
             for fan in fans:
                 # skip fans that are not four pin (PWM)
                 if not fan.four_pin:
-                    scheduler.app.logger.debug("Skipping setpoint polling for fan %s; Not a PWM fan.", fan.id)
+                    _logger.debug("Skipping setpoint polling for fan %s; Not a PWM fan.", fan.id)
                     continue
                 new_pwm = None
                 setpoints = db.session.query(FanSetpoint) \
@@ -211,9 +213,9 @@ def poll_setpoints() -> None:
                     fan.pwm = int(new_pwm.data)
                     db.session.commit()
                     # write changes to db if request is successful
-                    scheduler.app.logger.info("Fan %s setpoint updated; New PWM: %s", fan.id, new_pwm)
+                    _logger.info("Fan %s setpoint updated; New PWM: %s", fan.id, new_pwm)
                 else:
-                    scheduler.app.logger.debug("Fan %s setpoint is correct; no changes made", fan.fan_id)
+                    _logger.debug("Fan %s setpoint is correct; no changes made", fan.fan_id)
 
 
 def ping_controllers(controller_id: Optional[int] = None) -> Union[list[dict], list[None]]:
@@ -257,7 +259,7 @@ def query_controller_properties(controller: Controller) -> Controller:
             try:
                 controller.fan_port_cnt = int(fc.data)
             except ValueError:
-                scheduler.app.logger.error(f"Received a non-integer value for fan_port_cnt: {fc}")
+                _logger.error(f"Received a non-integer value for fan_port_cnt: {fc}")
                 controller.fan_port_cnt = 0
 
             # get firmware version
@@ -341,7 +343,7 @@ def fan_calibration(fan_id: int) -> None:
         else:
             original_rpm = fan_model.rpm
         original_pwm = fan_model.pwm if fan_model.pwm != 0 else DEFAULT_FAN_PWM
-        scheduler.app.logger.debug(f"fan_calibration: initial values; rpm={original_rpm}; pwm={original_pwm}")
+        _logger.debug(f"fan_calibration: initial values; rpm={original_rpm}; pwm={original_pwm}")
         tty.command_write(JBODCommand.PWM, fan_model.controller_id, fan_model.id, MIN_FAN_PWM)
         # wait for rpm value to normalize
         r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.id)
@@ -353,7 +355,7 @@ def fan_calibration(fan_id: int) -> None:
             r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.id)
             new_rpm = int(r.data)
             wait_secs += 1
-        scheduler.app.logger.debug(f"fan_calibration: min rpm normalization took {wait_secs} secs.  "
+        _logger.debug(f"fan_calibration: min rpm normalization took {wait_secs} secs.  "
                                    f"New min rpm value is {round(new_rpm, -2)}")
         # store new readings in min_rpm; round to the nearest 100th
         fan_model.min_rpm = round(new_rpm, -2)
@@ -370,7 +372,7 @@ def fan_calibration(fan_id: int) -> None:
             r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.id)
             new_rpm = int(r.data)
             wait_secs += 1
-        scheduler.app.logger.debug(f"fan_calibration: max rpm normalization took {wait_secs} secs.  "
+        _logger.debug(f"fan_calibration: max rpm normalization took {wait_secs} secs.  "
                                    f"New min rpm value is {round(new_rpm, -2)}")
         fan_model.max_rpm = round(new_rpm, -2)
         # define four pin
@@ -379,7 +381,7 @@ def fan_calibration(fan_id: int) -> None:
         else:
             fan_model.four_pin = True
         # Set fan back to original PWM
-        scheduler.app.logger.debug("fan_calibration: Complete! Setting fan back to initial values.")
+        _logger.debug("fan_calibration: Complete! Setting fan back to initial values.")
         tty.command_write(JBODCommand.PWM, fan_model.controller_id, fan_model.id, original_pwm)
         fan_model.rpm = original_rpm
         # commit changes to db
@@ -422,12 +424,12 @@ def test_fan_job(fan_id) -> None:
     with scheduler.app.app_context():
         from random import randint
         time.sleep(randint(7, 10))
-        scheduler.app.logger.debug(f"test_fan_job ran! fan_id: {fan_id}")
+        _logger.debug(f"test_fan_job ran! fan_id: {fan_id}")
 
 
 def _truenas_shutdown(tty: JBODConsole):
     with scheduler.app.app_context():
-        scheduler.app.logger.info("Shutdown request received from controller. "
+        _logger.info("Shutdown request received from controller. "
                                   "Attempting to shutdown host now.")
         resp = helpers.truenas_api_request(
             'POST',
@@ -436,10 +438,10 @@ def _truenas_shutdown(tty: JBODConsole):
             data={"delay": 0}
         )
         if resp.status_code == 200:
-            scheduler.app.logger.info("Host confirmed shutdown request. Shutting down...")
+            _logger.info("Host confirmed shutdown request. Shutting down...")
             tty.command_write(tty.ctrlc.ACK)
         else:
-            scheduler.app.logger.info("Host shutdown request failed! Attempting to cancel shutdown...")
+            _logger.info("Host shutdown request failed! Attempting to cancel shutdown...")
             # shutdown failed; send cancellation to all controllers
             for controller in db.session.query(Controller).all():
                 try:
@@ -457,11 +459,11 @@ def console_callback(tty: JBODConsole, rx: JBODRxData):
         if rx.xoff:
             _truenas_shutdown(tty)
         elif rx.xon:
-            scheduler.app.logger.warning("ACPI ON Event received but host is already on! %s", rx)
+            _logger.warning("ACPI ON Event received but host is already on! %s", rx)
         elif rx.dc2:
             # Device Control 2 used to broadcast controller psu, rpm, and pwm data
             # response example: {466-2038344B513050-19-1003:{psu:ON,rpm:[1000,1200,0,3000],pwm:[40,30,0,20]}}
-            scheduler.app.logger.debug("Attempting to parse rpm data: %s", rx)
+            _logger.debug("Attempting to parse rpm data: %s", rx)
             try:
                 resp = json.loads(rx.data.strip("\r\n"))
                 ctrlr = db.session.query(Controller).where(Controller.mcu_device_id == resp['mcu']).first()
@@ -474,30 +476,30 @@ def console_callback(tty: JBODConsole, rx: JBODRxData):
                 # update psu status if needed
                 if (ctrlr.psu_on == True and data['psu'] != "ON") or (ctrlr.psu_on == False and data['psu'] == "ON"):
                     ctrlr.psu_on = data['psu'] == "ON"
-                    scheduler.app.logger.info("psu status for %s updated to %s", ctrlr.mcu_device_id, ctrlr.psu_on)
+                    _logger.info("psu status for %s updated to %s", ctrlr.mcu_device_id, ctrlr.psu_on)
                     db.session.commit()
 
                 # update fan(s) rpm and pwm values
                 for i, rpm in enumerate(data['rpm']):
                     fan = db.session.query(Fan).where(Fan.controller_id == ctrlr.id, Fan.port_num == i+1).first()
                     if not fan:
-                        scheduler.app.logger.warning("Unable to find associated fan for rpm data: %s", rx)
+                        _logger.warning("Unable to find associated fan for rpm data: %s", rx)
                     else:
                         fan.pwm = data['pwm'][i]
                         fan.rpm = int(rpm)
                         fan.rpm_deviation = helpers.fan_rpm_deviation(fan)
-                        scheduler.app.logger.debug("Stored fan[%s] rpm: %s; Deviation: %s",
-                                                   fan.id, fan.rpm, fan.rpm_deviation)
+                        _logger.debug("Stored fan[%s] rpm: %s; Deviation: %s",
+                                      fan.id, fan.rpm, fan.rpm_deviation)
                         db.session.commit()
             except Exception:  # noqa
-                scheduler.app.logger.error("Unable to parse controller data: %s", rx)
+                _logger.error("Unable to parse controller data: %s", rx)
         elif rx.dc4:
             # misc controller event messages
             msg_type, msg_body = rx.data.split(":")[0], rx.data.split(":")[1]
             if msg_type == 'reset_event':
                 rst_code = ResetEvent(int(msg_body)).name
-                scheduler.app.logger.warning("Controller reset event: %s", rst_code)
+                _logger.warning("Controller reset event: %s", rst_code)
             else:
-                scheduler.app.logger.warning("Unknown ds4 event message received: %s", rx)
+                _logger.warning("Unknown ds4 event message received: %s", rx)
         else:
-            scheduler.app.logger.warning("Uncaught console event received: %s", rx)
+            _logger.warning("Uncaught console event received: %s", rx)
