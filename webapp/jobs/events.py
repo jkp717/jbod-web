@@ -47,7 +47,7 @@ def job_added_listener(event):
             # must be a separate job b/c the dc2 request is sent in a separate thread and returned in callback
             job = db.session.query(SysJob).where(SysJob.job_id == getattr(event, 'job_id')).first()
             jobs.scheduler.add_job('_poll_controller_data', func="webapp.jobs:_poll_controller_data",
-                                   trigger='interval', second=job.seconds, minute=job.minutes)
+                                   trigger='interval', seconds=job.seconds, minutes=job.minutes)
 
 
 def job_removed_listener(event):
