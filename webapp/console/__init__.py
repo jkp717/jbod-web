@@ -119,7 +119,7 @@ class JBODRxData:
 
     @property
     def dc4(self):
-        return self.cc_mapper.get(str(JBODControlCharacter.DC2.value).encode(self.ENCODING))
+        return self.cc_mapper.get(str(JBODControlCharacter.DC4.value).encode(self.ENCODING))
 
     def set_flag(self, cc):
         self.cc_mapper[cc] = True

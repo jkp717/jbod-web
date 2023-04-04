@@ -474,9 +474,9 @@ def console_callback(tty: JBODConsole, rx: JBODRxData):
         elif rx.dc2:
             # Device Control 2 used to broadcast controller psu, rpm, and pwm data
             # response example: {466-2038344B513050-19-1003:{psu:ON,rpm:[1000,1200,0,3000],pwm:[40,30,0,20]}}
-            _logger.debug("Attempting to parse rpm data: %s", rx)
+            _logger.debug("Attempting to parse rpm data: %s", rx.raw_data)
             try:
-                resp = json.loads(rx.data.strip("\r\n"))
+                resp = json.loads(rx.data.strip("\r\n\x00"))
                 ctrlr = db.session.query(Controller).where(Controller.mcu_device_id == resp['mcu']).first()
                 data = resp['data']
 
