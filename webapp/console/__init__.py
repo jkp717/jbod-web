@@ -275,7 +275,8 @@ class JBODConsole:
             fmt_command = command.value
         b = bytearray(str(fmt_command), self.ENCODING)  # convert str to bytearray
         b.extend(self.TERMINATOR)  # add terminator to end of bytearray
-        self.serial.write(bytes(b))  # convert bytearray to bytes
+        with self._lock:
+            self.serial.write(bytes(b))  # convert bytearray to bytes
         resp = JBODRxData(self.receive_now())
         if not resp.ack:
             raise JBODConsoleAckException(
@@ -286,7 +287,7 @@ class JBODConsole:
         return resp
 
     def flush_buffers(self):
-        self._data_received = None
+        self._data_received = bytearray()
         self.rx_buffer = None
         self.tx_buffer = None
 
