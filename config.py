@@ -5,6 +5,7 @@
 import os
 import base64
 from dotenv import load_dotenv
+import logging
 
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -24,9 +25,11 @@ class DevConfig(Config):
     DEBUG = True
     TESTING = True
     SERIAL_DEBUG = True
+    LOGGING_LEVEL = logging.DEBUG
 
 
 class ProdConfig(Config):
     DEBUG = False
     TESTING = False
     SERIAL_DEBUG = False
+    LOGGING_LEVEL = logging.INFO

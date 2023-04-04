@@ -305,13 +305,13 @@ def _poll_controller_data() -> None:
     """
     with scheduler.app.app_context():
         job = db.session.query(SysJob).where(SysJob.job_id == 'poll_controller_data').first()
-        if job is None:
-            return None
-        if job.active is False:
-            return None
-        ctrlr = db.session.query(Controller).all()
-        for c in ctrlr:
-            c.alive = c.last_ds2 >= datetime.utcnow() - timedelta(seconds=job.seconds*2, minutes=job.minutes*2)
+        if job.active:
+            ctrlr = db.session.query(Controller).all()
+            for c in ctrlr:
+                if c.last_ds2 >= datetime.utcnow() - timedelta(seconds=job.seconds*2, minutes=job.minutes*2):
+                    c.alive = True
+                else:
+                    c.alive = False
             db.session.commit()
 
 
@@ -450,7 +450,7 @@ def console_callback(tty: JBODConsole, rx: JBODRxData):
                 data = resp['data']
 
                 # record the timestamp of this response
-                ctrlr.last_ds2 = datetime.datetime.utcnow()
+                ctrlr.last_ds2 = datetime.utcnow()
                 db.session.commit()
 
                 # update psu status if needed

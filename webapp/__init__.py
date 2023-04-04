@@ -2,6 +2,7 @@ import logging
 import os
 import base64
 from flask import Flask
+from flask.logging import default_handler
 from logging.handlers import RotatingFileHandler
 from sqlalchemy.exc import IntegrityError
 from flask_admin import Admin
@@ -42,7 +43,7 @@ def setup_flask_admin(app_instance, session):
     return app_instance
 
 
-def setup_logger(file_path: str, app_instance: Flask):
+def setup_logger(file_path: str, app_instance: Flask, level: int):
     if not os.path.exists(file_path):
         if file_path.endswith(('/', '\\')):
             os.mkdir(file_path)
@@ -50,7 +51,11 @@ def setup_logger(file_path: str, app_instance: Flask):
         else:
             file_path = os.path.normpath(file_path)
     file_handler = RotatingFileHandler(filename=file_path, mode='a', maxBytes=100000, backupCount=0)
-    app_instance.logger.addHandler(file_handler)
+    file_handler.setLevel(level)
+    for logger in (app_instance.logger, logging.getLogger('apscheduler_events')):
+        logger.setLevel(level)
+        logger.addHandler(file_handler)
+        logger.addHandler(default_handler)
 
 
 def generate_key(salt, token) -> Fernet:
@@ -122,7 +127,7 @@ def create_app(dev=False):
         log_path = helpers.get_config_value('log_path')
         if not log_path:
             log_path = os.path.normpath(os.path.join(app.instance_path, 'ipmi.log'))
-        setup_logger(file_path=log_path, app_instance=app)
+        setup_logger(file_path=log_path, app_instance=app, level=app.config['LOGGING_LEVEL'])
         alert_handler = helpers.AlertLogHandler(alert_model=Alert, app_context=app, db_session=db.session)
         alert_handler.setLevel(logging.WARNING)  # prevent overflow of alerts
         app.logger.addHandler(alert_handler)
@@ -140,20 +145,17 @@ def create_app(dev=False):
         # setup console threads for read/writes
         jobs.get_console()
 
-    jobs.scheduler.init_app(app)
     app = setup_flask_admin(app, db.session)
+    jobs.scheduler.init_app(app)
 
     # setup apscheduler and event listeners
-    jobs.scheduler.start()
-    # add helper job to keep track of controller states
-    jobs.scheduler.add_job('_poll_controller_data', func="webapp.jobs:_poll_controller_data",
-                           trigger='interval', seconds=30)
     jobs.scheduler.add_listener(jobs.ev.job_missed_listener, EVENT_JOB_MISSED)
     jobs.scheduler.add_listener(jobs.ev.job_error_listener, EVENT_JOB_ERROR)
     jobs.scheduler.add_listener(jobs.ev.job_executed_listener, EVENT_JOB_EXECUTED)
     jobs.scheduler.add_listener(jobs.ev.job_added_listener, EVENT_JOB_ADDED)
     jobs.scheduler.add_listener(jobs.ev.job_removed_listener, EVENT_JOB_REMOVED)
     jobs.scheduler.add_listener(jobs.ev.job_submitted_listener, EVENT_JOB_SUBMITTED)
+    jobs.scheduler.start()
 
     # add custom functions to jinja environment
     app.jinja_env.globals.update(truenas_connection_info=jobs.truenas_connection_info)
