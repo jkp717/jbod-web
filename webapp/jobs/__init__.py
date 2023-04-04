@@ -390,6 +390,17 @@ def sound_controller_alarm(controller_id: int, duration: int = 3) -> None:
         tty.command_write(JBODCommand.ALARM, controller_id, '00')
 
 
+def toggle_controller_led(controller_id: int, duration: int = 10) -> None:
+    with scheduler.app.app_context():
+        tty = get_console()
+        if not tty:
+            raise SerialException("Serial connection not established.")
+        # 50 is the recommended duty cycle for piezo buzzer used
+        tty.command_write(JBODCommand.LED_ON, controller_id, 2)
+        time.sleep(duration)
+        tty.command_write(JBODCommand.LED_OFF, controller_id, 2)
+
+
 def test_serial_job() -> None:
     with current_app.app_context():
         print("writing test started")

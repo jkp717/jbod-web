@@ -66,6 +66,8 @@ class JBODCommand(Enum):
     DEVICE_ID = "jbod/? id"
     FIRMWARE_VERSION = "jbod/? version"
     PING = "jbod/? ping"  # responds with ack & 'OK'
+    LED_ON = "jbod/? led/? ON"
+    LED_OFF = "jbod/? led/? OFF"
 
 
 class JBODControlCharacter(Enum):

@@ -403,6 +403,25 @@ class ControllerView(JBODBaseView):
     def on_model_change(self, form, model, is_created):
         helpers.cascade_controller_fan(model, form, is_created)
 
+    @expose('/identify/<controller_id>', methods=['GET'])
+    def identify(self, controller_id):
+        """
+        Called by row action; schedules job to toggle
+        LED on for 3 seconds.
+        """
+        job_uuid = uuid.uuid4()
+        identify_job = {
+            "id": str(job_uuid),
+            "name": "toggle_controller_led",
+            "func": "webapp.jobs:toggle_controller_led",
+            "replace_existing": True,
+            "args": (controller_id,),
+            # omit trigger to run immediately
+        }
+        scheduler.add_job(**identify_job)
+        flash(f"Chassis LED active on  (Controller: {controller_id})...")
+        return redirect(self.get_url('.index_view'))
+
     @expose('/alarm/<controller_id>', methods=['GET'])
     def alarm(self, controller_id):
         """
@@ -410,7 +429,7 @@ class ControllerView(JBODBaseView):
         alarm on for 3 seconds.
         """
         job_uuid = uuid.uuid4()
-        calibration_job = {
+        sound_alarm_job = {
             "id": str(job_uuid),
             "name": "sound_controller_alarm",
             "func": "webapp.jobs:sound_controller_alarm",
@@ -418,7 +437,7 @@ class ControllerView(JBODBaseView):
             "args": (controller_id,),
             # omit trigger to run immediately
         }
-        scheduler.add_job(**calibration_job)
+        scheduler.add_job(**sound_alarm_job)
         flash(f"Triggering alarm sound on controller {controller_id}...")
         return redirect(self.get_url('.index_view'))
 

@@ -137,6 +137,11 @@ class ControllerAlarmRowAction(TemplateLinkRowAction):
         super(ControllerAlarmRowAction, self).__init__('custom_row_actions.controller_alarm')
 
 
+class ControllerLEDRowAction(TemplateLinkRowAction):
+    def __init__(self):
+        super(ControllerLEDRowAction, self).__init__('custom_row_actions.controller_led')
+
+
 def get_model_by_id(model, id: Union[str, int], column_name: Optional[str] = 'id'):
     return db.session.query(model).where(getattr(model, column_name) == id).first()
 
