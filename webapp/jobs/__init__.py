@@ -18,6 +18,15 @@ scheduler = APScheduler()
 _logger = logging.getLogger("apscheduler_jobs")
 
 
+def activate_sys_job(job_id: Union[str, int]):
+    with current_app.app_context():
+        job = db.session.query(SysJob).where(SysJob.job_id == job_id).first()
+        if not job.active:
+            scheduler.add_job(**job.job_dict)
+            job.active = True
+            db.session.commit()
+
+
 def get_console() -> Union[JBODConsole, None]:
     with current_app.app_context():
         if not getattr(current_app, 'console', None):
@@ -250,7 +259,7 @@ def query_controller_properties(controller: Controller) -> Controller:
         if not tty:
             raise SerialException("Serial connection not established.")
         try:
-            # returns a json like object with id, lot, waf, rev properties
+            # returns a UUID of device id
             dev_id = tty.command_write(JBODCommand.DEVICE_ID, controller.id)
             controller.mcu_device_id = str(dev_id.data)
 
@@ -271,6 +280,8 @@ def query_controller_properties(controller: Controller) -> Controller:
             controller.psu_on = psu.data == 'ON'
 
             controller.alive = True
+            # Turn on controller data polling job (if not already)
+            activate_sys_job('poll_controller_data')
         except JBODConsoleException:
             controller.alive = False
         # return updated model

@@ -11,7 +11,7 @@ from datetime import datetime
 from flask_admin.model import typefmt
 from flask_admin.model.template import TemplateLinkRowAction
 
-from webapp.models import db, FanSetpoint, SysConfig, Disk, Controller, Fan, Alert
+from webapp.models import db, FanSetpoint, SysConfig, Disk, Controller, Fan, Alert, SysJob
 
 from webapp.config import MAX_FAN_PWM, MIN_FAN_PWM
 
