@@ -35,8 +35,9 @@ def get_console() -> Union[JBODConsole, None]:
                 # set console to None if port is not provided
                 current_app.__setattr__('console', None)
                 return None
-            if current_app.config['SERIAL_DEBUG']:
-                port = f"spy:///{port}?file=serial.log"
+            if current_app.config['SERIAL_DEBUG'] and current_app.config['SERIAL_DEBUG_FILE']:
+                port = f"spy:///{port}?file={current_app.config['SERIAL_DEBUG_FILE']}"
+
             try:
                 tty = JBODConsole(
                     serial_for_url(
@@ -320,7 +321,7 @@ def _poll_controller_data() -> None:
             ctrlr = db.session.query(Controller).all()
             for c in ctrlr:
                 if not c.last_ds2:
-                    c.alive = False
+                    pass
                 elif c.last_ds2 >= datetime.utcnow() - timedelta(seconds=job.seconds*2, minutes=job.minutes*2):
                     c.alive = True
                 else:
@@ -479,16 +480,12 @@ def console_callback(tty: JBODConsole, rx: JBODRxData):
                 resp = json.loads(rx.data.strip("\r\n\x00"))
                 ctrlr = db.session.query(Controller).where(Controller.mcu_device_id == resp['mcu']).first()
                 data = resp['data']
-
-                # record the timestamp of this response
-                ctrlr.last_ds2 = datetime.utcnow()
-                db.session.commit()
+                _logger.debug("Controller matched to ds2: %s", ctrlr)
 
                 # update psu status if needed
                 if (ctrlr.psu_on == True and data['psu'] != "ON") or (ctrlr.psu_on == False and data['psu'] == "ON"):
                     ctrlr.psu_on = data['psu'] == "ON"
                     _logger.info("psu status for %s updated to %s", ctrlr.mcu_device_id, ctrlr.psu_on)
-                    db.session.commit()
 
                 # update fan(s) rpm and pwm values
                 for i, rpm in enumerate(data['rpm']):
@@ -501,9 +498,11 @@ def console_callback(tty: JBODConsole, rx: JBODRxData):
                         fan.rpm_deviation = helpers.fan_rpm_deviation(fan)
                         _logger.debug("Stored fan[%s] rpm: %s; Deviation: %s",
                                       fan.id, fan.rpm, fan.rpm_deviation)
-                        db.session.commit()
-            except Exception:  # noqa
+                ctrlr.last_ds2 = datetime.utcnow()
+                db.session.commit()
+            except Exception as err:  # noqa
                 _logger.error("Unable to parse controller data: %s", rx)
+                _logger.error(err)
         elif rx.dc4:
             # misc controller event messages
             msg_type, msg_body = rx.data.split(":")[0], rx.data.split(":")[1]

@@ -60,6 +60,7 @@ class NewSetupView(BaseView):
 
     @expose('/truenas', methods=['POST'])
     def truenas(self):
+        """Truenas initial setup"""
         if request.method == 'POST':
             content = request.get_json(force=True)
             for k, v in content.items():
@@ -71,6 +72,7 @@ class NewSetupView(BaseView):
 
     @expose('/controller', methods=['GET', 'POST'])
     def controller(self):
+        """Controller(s) initial setup"""
         if request.method == 'POST':
             content = request.get_json(force=True)
             for k, v in content.items():
@@ -95,7 +97,7 @@ class NewSetupView(BaseView):
                                 }), 400
                         elif k == 'baud_rate':
                             try:
-                                tty.change_baudrate(v)
+                                tty.change_baudrate(int(v))
                             except serial.SerialException:
                                 model.value = None
                                 db.session.commit()
