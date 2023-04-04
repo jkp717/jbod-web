@@ -379,14 +379,14 @@ class ChassisView(JBODBaseView):
 
 
 class ControllerView(JBODBaseView):
-    # can_create = False
-    can_create = True
+    can_create = False
+    # can_create = True
     can_edit = False
     refresh_view = '.broadcast'
     list_template = 'refresh_list.html'
     column_list = ['id', 'mcu_device_id', 'firmware_version', 'fan_port_cnt', 'psu_on', 'alive']
     column_formatters = {'id': helpers.controller_id_formatter}
-    column_extra_row_actions = [helpers.ControllerAlarmRowAction()]
+    column_extra_row_actions = [helpers.ControllerAlarmRowAction(), helpers.ControllerLEDRowAction()]
 
     def get_empty_list_message(self):
         return Markup(f"<a href={self.get_url('.broadcast')}>Search for connected Controllers</a>")
