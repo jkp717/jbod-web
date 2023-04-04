@@ -52,6 +52,7 @@ def setup_logger(file_path: str, app_instance: Flask, level: int):
             file_path = os.path.normpath(file_path)
     file_handler = RotatingFileHandler(filename=file_path, mode='a', maxBytes=100000, backupCount=0)
     file_handler.setLevel(level)
+    file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
     for logger in (app_instance.logger, logging.getLogger('apscheduler_events')):
         logger.setLevel(level)
         logger.addHandler(file_handler)
