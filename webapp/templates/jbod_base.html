@@ -63,8 +63,8 @@ $(function () {
     html: true
   });
 
-  // sets up 5 sec polling for console status
-  pollConsoleStatus("{{ get_url('controller.alive') }}", 5000);
+  // sets up 10 sec polling for console status
+  pollConsoleStatus("{{ get_url('controller.alive') }}", 10000);
 });
 </script>
 {% endblock %}
