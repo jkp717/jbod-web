@@ -321,8 +321,7 @@ def fan_calibration(fan_id: int) -> None:
     """
     Ran to determine fan RPM to PWM curve. Should only run
     once when a fan is installed or when the fan RPM curve
-    deviates outside the allowable range. Returns updated
-    Fan model.
+    deviates outside the allowable range.
     """
     max_wait_secs = 5  # max seconds to wait for rpm to normalize
     wait_secs = 0
@@ -431,7 +430,7 @@ def test_fan_job(fan_id) -> None:
 def _truenas_shutdown(tty: JBODConsole):
     with scheduler.app.app_context():
         _logger.info("Shutdown request received from controller. "
-                                  "Attempting to shutdown host now.")
+                     "Attempting to shutdown host now.")
         resp = helpers.truenas_api_request(
             'POST',
             '/api/v2.0/system/shutdown',
