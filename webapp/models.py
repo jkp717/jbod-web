@@ -1,6 +1,7 @@
 import datetime
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.ext.hybrid import hybrid_property
+from webapp.config import DEFAULT_FAN_PWM
 
 
 db = SQLAlchemy()
@@ -287,7 +288,7 @@ class Fan(db.Model):
     controller_id = db.Column(db.Integer, db.ForeignKey("controller.id"))
     port_num = db.Column(db.Integer)
     description = db.Column(db.String)
-    pwm = db.Column(db.Integer, default=100)
+    pwm = db.Column(db.Integer, default=DEFAULT_FAN_PWM)
     rpm = db.Column(db.Integer, default=0)
     max_rpm = db.Column(db.Integer)
     min_rpm = db.Column(db.Integer)
