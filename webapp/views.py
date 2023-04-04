@@ -153,7 +153,7 @@ class FanView(JBODBaseView):
     column_exclude_list = JBODBaseView.column_exclude_list + [
         'calibration_job_uuid', 'calibration_status'
     ]
-    column_editable_list = ['description']
+    column_editable_list = ['description', 'pwm']
     form_excluded_columns = JBODBaseView.form_excluded_columns + [
         'setpoints', 'rpm', 'active', 'four_pin', 'port_num', 'controller', 'min_rpm', 'max_rpm',
         'calibration_job_uuid', 'calibration_status', 'pwm', 'rpm_deviation'
@@ -161,6 +161,19 @@ class FanView(JBODBaseView):
     form_rules = [rules.Header('Fan Setpoints')]
     column_filters = ['controller.id', 'controller.chassis', 'controller.chassis.id', 'rpm', 'active']
     column_extra_row_actions = [helpers.FanCalibrationRowAction()]
+
+    def on_model_change(self, form, model, is_created):
+        old_model = helpers.get_model_by_id(Fan, model.id)
+        # check for changing PWM value
+        if old_model.pwm != model.pwm:
+            tty = get_console()
+            if tty:
+                tty.command_write(tty.cmd.PWM, Fan.controller_id, model.pwm)
+                current_app.logger.info(f"Manually adjusting PWM value on fan {model.id} to {model.pwm}")
+            else:
+                current_app.logger.error("Cannot adjust PWM; no controllers are currently connected!")
+                model.pwm = old_model.pwm
+                db.session.commit()
 
     @expose('/calibrate/', methods=['GET'])
     def calibrate(self):
