@@ -280,8 +280,6 @@ def query_controller_properties(controller: Controller) -> Controller:
             controller.psu_on = psu.data == 'ON'
 
             controller.alive = True
-            # Turn on controller data polling job (if not already)
-            activate_sys_job('poll_controller_data')
         except JBODConsoleException:
             controller.alive = False
         # return updated model

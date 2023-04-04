@@ -14,7 +14,7 @@ from serial.tools.list_ports import comports
 from webapp import helpers
 from webapp.models import db, PhySlot, FanSetpoint, Fan, Controller, SysConfig, Chassis, SysJob, Alert
 from webapp.jobs import scheduler, query_disk_properties, query_controller_properties, \
-    truenas_connection_info, get_console, ping_controllers, console_connection_check
+    truenas_connection_info, get_console, ping_controllers, console_connection_check, activate_sys_job
 from webapp.jobs.events import fan_calibration_job_listener
 
 
@@ -501,6 +501,8 @@ class ControllerView(JBODBaseView):
                     return redirect(self.get_url('.index_view')), 500
                 db.session.add(c_model)
                 helpers.cascade_controller_fan(c_model)
+                # Turn on controller data polling job (if not already)
+                activate_sys_job('poll_controller_data')
             db.session.commit()
         if request.is_json:
             return jsonify({'result': 'ready', 'controllers': {
