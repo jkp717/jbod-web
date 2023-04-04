@@ -90,23 +90,37 @@ class JBODRxData:
     def __init__(self, data: bytes):
         self.raw_data = data
         self._data = None
-        # Set initial values to False
-        self.ack = False
-        self.xon = False
-        self.xoff = False
-        self.dc2 = False
-        self.dc4 = False
-        # ACK & NAK ascii character as bytes
-        self._ackc = str(JBODControlCharacter.ACK.value).encode(self.ENCODING)
-        self._nakc = str(JBODControlCharacter.NAK.value).encode(self.ENCODING)
-        # XON & XOFF ascii character as bytes
-        self._xonc = str(JBODControlCharacter.XON.value).encode(self.ENCODING)
-        self._xoffc = str(JBODControlCharacter.XOFF.value).encode(self.ENCODING)
-        # Device Control
-        self._dc2c = str(JBODControlCharacter.DC2.value).encode(self.ENCODING)
-        self._dc4c = str(JBODControlCharacter.DC4.value).encode(self.ENCODING)
-
+        self.cc_mapper = {
+            str(JBODControlCharacter.ACK.value).encode(self.ENCODING): False,
+            str(JBODControlCharacter.XON.value).encode(self.ENCODING): False,
+            str(JBODControlCharacter.XOFF.value).encode(self.ENCODING): False,
+            str(JBODControlCharacter.DC2.value).encode(self.ENCODING): False,
+            str(JBODControlCharacter.DC4.value).encode(self.ENCODING): False,
+        }
         self._parse_data(data)
+
+    @property
+    def ack(self):
+        return self.cc_mapper.get(str(JBODControlCharacter.ACK.value).encode(self.ENCODING))
+
+    @property
+    def xon(self):
+        return self.cc_mapper.get(str(JBODControlCharacter.XON.value).encode(self.ENCODING))
+
+    @property
+    def xoff(self):
+        return self.cc_mapper.get(str(JBODControlCharacter.XOFF.value).encode(self.ENCODING))
+
+    @property
+    def dc2(self):
+        return self.cc_mapper.get(str(JBODControlCharacter.DC2.value).encode(self.ENCODING))
+
+    @property
+    def dc4(self):
+        return self.cc_mapper.get(str(JBODControlCharacter.DC2.value).encode(self.ENCODING))
+
+    def set_flag(self, cc):
+        self.cc_mapper[cc] = True
 
     @property
     def data(self):
@@ -114,16 +128,18 @@ class JBODRxData:
 
     @data.setter
     def data(self, val: Union[bytearray, str]):
+        """Automatically decoded to ASCII"""
         if isinstance(val, bytearray):
             self._data = val.decode(self.ENCODING)
         else:
             self._data = val
 
     def _parse_data(self, data: bytes):
-        for prop, cc in [('ack', '_ackc'), ('xon', '_xonc'), ('xoff', '_xoffc'), ('dc2', '_dc2c'), ('dc4', '_dc4c')]:
-            if bytearray(data).startswith(self.__getattribute__(cc)):
-                self.__setattr__(prop, True)
-                self.data = bytearray(data).removeprefix(self.__getattribute__(cc)).strip(b'\r\n')
+        """First character defines message type; followed by message"""
+        for ctrlc in self.cc_mapper.keys():
+            if bytearray(data).startswith(ctrlc):
+                self.set_flag(ctrlc)
+                self.data = bytearray(data).removeprefix(ctrlc).strip(b'\r\n')
                 break
 
     def __repr__(self):
