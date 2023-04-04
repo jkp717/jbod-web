@@ -226,8 +226,8 @@ class JBODConsole:
                         # reset bytearray
                         self._data_received = bytearray()
                         retries = 0
-                        # give time to process rx data (1 sec max)
-                        while retries < 10 and self.NEW_RX_DATA:
+                        # give time to process rx data (0.5 sec max)
+                        while retries < 5 and self.NEW_RX_DATA:
                             time.sleep(0.1)
                             retries += 1
                         # passing to callback if data has not been processed
@@ -309,6 +309,10 @@ class JBODConsole:
         # set to flag to false if None
         if not data:
             self.NEW_RX_DATA = False
+        # check if data is already sitting in buffer
+        elif self.NEW_RX_DATA:
+            # combine both into one bytearray
+            self._rx_buffer += data
         else:
             self.NEW_RX_DATA = True
         self._rx_buffer = data

@@ -1,6 +1,6 @@
 /__pycache__
 .idea
 /tests
-/instance/ipmi.db
+/instance/*
 ipmi.log*
 /.env
