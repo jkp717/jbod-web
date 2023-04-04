@@ -127,7 +127,7 @@ def create_app(dev=False):
         # setup logger
         log_path = helpers.get_config_value('log_path')
         if not log_path:
-            log_path = os.path.normpath(os.path.join(app.instance_path, 'ipmi.log'))
+            log_path = os.path.normpath(os.path.join(app.instance_path, 'jbod.log'))
         setup_logger(file_path=log_path, app_instance=app, level=app.config['LOGGING_LEVEL'])
         alert_handler = helpers.AlertLogHandler(alert_model=Alert, app_context=app, db_session=db.session)
         alert_handler.setLevel(logging.WARNING)  # prevent overflow of alerts
@@ -164,6 +164,5 @@ def create_app(dev=False):
     app.jinja_env.globals.update(disk_tooltip_html=helpers.disk_tooltip_html)
     app.jinja_env.globals.update(svg_html_converter=helpers.svg_html_converter)
     app.jinja_env.globals.update(get_alerts=helpers.get_alerts)
-
     return app
 

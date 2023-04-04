@@ -17,7 +17,7 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY')
     SECRET_KEY_SALT = base64.b64decode(bytes(os.environ.get('SECRET_KEY_SALT'), "utf-8"))
     FLASK_ADMIN_FLUID_LAYOUT = True
-    SQLALCHEMY_DATABASE_URI = f"sqlite:///{os.path.join(basedir, 'instance', 'ipmi.db')}"
+    SQLALCHEMY_DATABASE_URI = f"sqlite:///{os.path.join(basedir, 'instance', 'jbod.db')}"
     SCHEDULER_JOBS = []  # APScheduler Jobs
 
 
