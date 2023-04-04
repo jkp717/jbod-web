@@ -159,8 +159,8 @@ function pollConsoleStatus(pollUrl, pollInterval) {
                     popoverDiv: $('#connStatusPopover'),
                     iconDiv: iconDiv
                 });
-            // update if showing READY but controller is not alive
-            } else if (!($(iconDiv).hasClass('disconnected')) && result.alive) {
+            // update if NOT showing disconnected but controller is not alive
+            } else if (!($(iconDiv).hasClass('disconnected')) && !(result.alive)) {
                 updateStatusIcon({
                     statusMsg: "DEAD",
                     popoverDiv: $('#connStatusPopover'),
