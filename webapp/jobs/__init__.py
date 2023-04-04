@@ -319,7 +319,9 @@ def _poll_controller_data() -> None:
         if job.active:
             ctrlr = db.session.query(Controller).all()
             for c in ctrlr:
-                if c.last_ds2 >= datetime.utcnow() - timedelta(seconds=job.seconds*2, minutes=job.minutes*2):
+                if not c.last_ds2:
+                    c.alive = False
+                elif c.last_ds2 >= datetime.utcnow() - timedelta(seconds=job.seconds*2, minutes=job.minutes*2):
                     c.alive = True
                 else:
                     c.alive = False
