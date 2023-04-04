@@ -502,8 +502,8 @@ class ControllerView(JBODBaseView):
                 db.session.add(c_model)
                 helpers.cascade_controller_fan(c_model)
                 # Turn on controller data polling job (if not already)
-                activate_sys_job('poll_controller_data')
             db.session.commit()
+            activate_sys_job('poll_controller_data')
         if request.is_json:
             return jsonify({'result': 'ready', 'controllers': {
                 'acknowledged': ack_c, 'dead': dead_c, 'new': new_c}}), 200
