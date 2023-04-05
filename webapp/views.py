@@ -495,6 +495,7 @@ class ControllerView(JBODBaseView):
                 cd.alive = False
         db.session.commit()
         if request.args.get('action') == 'add':
+            new_models = []
             for new_id in new_c:
                 c_model = query_controller_properties(Controller(id=int(new_id)))
                 if not c_model.alive:
@@ -502,14 +503,17 @@ class ControllerView(JBODBaseView):
                     return redirect(self.get_url('.index_view')), 500
                 db.session.add(c_model)
                 # setup job to test connected fans & populate db
-                db.session.commit()
+                db.session.flush()
+                new_models.append(c_model)
+            db.session.commit()
+            for new_c in new_models:
                 job_uuid = uuid.uuid4()
                 cascade_fan_job = {
                     "id": str(job_uuid),
                     "name": "cascade_controller_fan",
                     "func": "webapp.jobs:cascade_controller_fan",
                     "replace_existing": True,
-                    "args": (c_model.id,),
+                    "args": (new_c.id,),
                     # omit trigger to run immediately
                 }
                 scheduler.add_job(**cascade_fan_job)
