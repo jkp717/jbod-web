@@ -13,13 +13,11 @@ function serverStatusAPI(connectionObj) {
     hostWS.onopen = function() {
       // connect to server websocket
       hostWS.send(JSON.stringify({"msg": "connect", "version": "1", "support": ["1"]}));
-      console.log("Connect message is sent...");
     };
     hostWS.onmessage = function (evt) {
       var recvObj = JSON.parse(evt.data);
       if (recvObj.msg == "connected") {
         connectionObj.session = recvObj.session;
-        console.log("wsSessionId: " + connectionObj.session);
         wsAuthenticate(hostWS, connectionObj, function(ws) {
             // connection now established
             ws.send(JSON.stringify({
@@ -58,16 +56,21 @@ function serverStatusAPI(connectionObj) {
                 }
             };
             ws.onclose = function(evt) {
-                console.log("Authenticated connection was closed???");
-                console.log(evt);
+                updateStatusIcon({
+                    statusMsg: "DEAD",
+                    popoverDiv: $('#connStatusPopover'),
+                    iconDiv: document.getElementById("hostConnStatus")
+                });
             };
         });
       }
     };
     hostWS.onclose = function(evt) {
-      // websocket is closed.
-      console.log("Connection is closed...");
-      console.log(evt);
+        updateStatusIcon({
+            statusMsg: "DEAD",
+            popoverDiv: $('#connStatusPopover'),
+            iconDiv: document.getElementById("hostConnStatus")
+        });
     };
 };
 
@@ -197,7 +200,7 @@ function updateStatusIcon(options) {
         $(iconDiv).addClass('disconnected');
         break;
       default:
-        iconDiv.querySelector('i').className = 'fa fa-solid fa-link-slash';
+        iconDiv.querySelector('i').className = 'fa fa-minus-circle';
         $(iconDiv).addClass('disconnected');
         break;
     }
@@ -206,7 +209,7 @@ function updateStatusIcon(options) {
     }
 
     // check for any disconnected children and update badge icon flag
-    if (popoverDiv.find('.popover-content-attr.disconnected').length !== 0) {
+    if (popoverDiv.find('.popover-content-attr.disconnected').length > 0) {
         popoverDiv.addClass('navbar-icon-alert');
     } else {
         popoverDiv.removeClass('navbar-icon-alert');
