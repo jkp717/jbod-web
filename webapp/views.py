@@ -159,7 +159,7 @@ class FanView(JBODBaseView):
     column_editable_list = ['description', 'pwm']
     form_excluded_columns = JBODBaseView.form_excluded_columns + [
        'setpoints', 'rpm', 'active', 'four_pin', 'port_num', 'controller', 'min_rpm', 'max_rpm',
-       'calibration_job_uuid', 'calibration_status', 'pwm', 'rpm_deviation'
+       'calibration_job_uuid', 'calibration_status', 'pwm'
     ]
     form_rules = [rules.Header('Fan Setpoints')]
     column_filters = ['controller.id', 'controller.chassis', 'controller.chassis.id', 'rpm', 'active']
@@ -491,7 +491,6 @@ class ControllerView(JBODBaseView):
             cd = helpers.get_model_by_id(Controller, old_id)
             if request.args.get('action') == 'delete':
                 db.session.delete(cd)
-                helpers.cascade_controller_fan(cd)
             else:
                 cd.alive = False
         db.session.commit()
@@ -502,9 +501,20 @@ class ControllerView(JBODBaseView):
                     flash("Oops! There was a problem communicating with controller. Try again.")
                     return redirect(self.get_url('.index_view')), 500
                 db.session.add(c_model)
-                helpers.cascade_controller_fan(c_model)
-                # Turn on controller data polling job (if not already)
+                # setup job to test connected fans & populate db
+                db.session.flush()
+                job_uuid = uuid.uuid4()
+                cascade_fan_job = {
+                    "id": str(job_uuid),
+                    "name": "cascade_controller_fan",
+                    "func": "webapp.jobs:cascade_controller_fan",
+                    "replace_existing": True,
+                    "args": (c_model.id,),
+                    # omit trigger to run immediately
+                }
+                scheduler.add_job(**cascade_fan_job)
             db.session.commit()
+            # Turn on controller data polling job (if not already)
             activate_sys_job('poll_controller_data')
         if request.is_json:
             return jsonify({'result': 'ready', 'controllers': {

@@ -12,6 +12,10 @@ MIN_FAN_PWM = 20
 # Value set when PWM is not provided
 DEFAULT_FAN_PWM = 50
 
+# abs rpm difference after testing pwm +/- 10
+# fan is a four_pin if > this value
+FOUR_PIN_RPM_DEVIATION = 50
+
 # configuration defaults
 config_defaults = {
     'timezone': 'America/Chicago',

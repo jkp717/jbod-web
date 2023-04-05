@@ -292,7 +292,6 @@ class Fan(db.Model):
     rpm = db.Column(db.Integer, default=0)
     max_rpm = db.Column(db.Integer)
     min_rpm = db.Column(db.Integer)
-    rpm_deviation = db.Column(db.Integer)
     four_pin = db.Column(db.Boolean, default=False)
     active = db.Column(db.Boolean, default=False)
     calibration_job_uuid = db.Column(db.String)

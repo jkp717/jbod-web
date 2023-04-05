@@ -11,7 +11,7 @@ from datetime import datetime
 from flask_admin.model import typefmt
 from flask_admin.model.template import TemplateLinkRowAction
 
-from webapp.models import db, FanSetpoint, SysConfig, Disk, Controller, Fan, Alert, SysJob
+from webapp.models import db, FanSetpoint, SysConfig, Disk, Controller, Fan, Alert
 
 from webapp.config import MAX_FAN_PWM, MIN_FAN_PWM
 
@@ -221,27 +221,6 @@ def cascade_controller_fan(model: Controller, *args, **kwargs):
         for row in del_rows:
             db.session.delete(row)
         db.session.commit()
-
-
-def fan_rpm_deviation(fan: Fan, pwm: Optional[int] = None) -> int:
-    """
-    Watchdog calculates expected RPM based on provided PWM.  Should be
-    ran each time rpm values are provided by controller.
-    @param fan: Fan Model
-    @param pwm: PWM to calculate (Model pwm used if not provided)
-    @return: Absolute RPM Deviation
-    """
-    # (pwm, rpm) = (x, y)
-    # TODO: Alert user of potential issues with fan
-    if fan.min_rpm and fan.max_rpm and fan.four_pin:
-        pwm = fan.pwm if not pwm else pwm
-        p1 = (int(MIN_FAN_PWM), fan.min_rpm)
-        p2 = (int(MAX_FAN_PWM), fan.max_rpm)
-        m = (p2[1] - p1[1]) / (p2[0] - p1[0])  # slope
-        y = p1[1] - m * p1[0]  # y-intercept
-        calc_rpm = (m * pwm) + y
-        return abs(fan.rpm - calc_rpm)
-    return 0
 
 
 class AlertLogHandler(logging.Handler):

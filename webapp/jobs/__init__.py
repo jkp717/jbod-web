@@ -11,7 +11,7 @@ from webapp.models import db, SysConfig, Disk, DiskTemp, Chassis, Fan, FanSetpoi
 from webapp.console import JBODCommand, JBODConsole, JBODConsoleException, JBODRxData, ResetEvent
 from webapp import helpers
 from webapp.jobs import events as ev
-from webapp.config import MIN_FAN_PWM, MAX_FAN_PWM, DEFAULT_FAN_PWM
+from webapp.config import MIN_FAN_PWM, MAX_FAN_PWM, DEFAULT_FAN_PWM, FOUR_PIN_RPM_DEVIATION
 
 
 scheduler = APScheduler()
@@ -495,9 +495,7 @@ def console_callback(tty: JBODConsole, rx: JBODRxData):
                     else:
                         fan.pwm = data['pwm'][i]
                         fan.rpm = int(rpm)
-                        fan.rpm_deviation = helpers.fan_rpm_deviation(fan)
-                        _logger.debug("Stored fan[%s] rpm: %s; Deviation: %s",
-                                      fan.id, fan.rpm, fan.rpm_deviation)
+                        _logger.debug("Stored fan[%s] rpm: %s", fan.id, fan.rpm)
                 ctrlr.last_ds2 = datetime.utcnow()
                 db.session.commit()
             except Exception as err:  # noqa
@@ -513,3 +511,37 @@ def console_callback(tty: JBODConsole, rx: JBODRxData):
                 _logger.warning("Unknown ds4 event message received: %s", rx)
         else:
             _logger.warning("Uncaught console event received: %s", rx)
+
+
+def cascade_controller_fan(controller_id: int):
+    """checks if a four pin fan; should be called when controller is added"""
+    with scheduler.app.app_context():
+        model = helpers.get_model_by_id(Controller, controller_id)
+        tty = get_console()
+        fans = []
+        for i in range(model.fan_port_cnt):
+            f = Fan(controller_id=model.id, port_num=i+1)
+            fans.append(f)
+        starting_rpm = []
+        for fan in fans:
+            ret = tty.command_write(tty.cmd.RPM, fan.controller_id, fan.port_num)
+            if int(ret.data) == 0:
+                fan.active = False
+                continue
+            starting_rpm.append(int(ret.data))
+            test_pwm = fan.pwm - 10 if fan.pwm + 10 > MAX_FAN_PWM else fan.pwm + 10
+            tty.command_write(tty.cmd.PWM, fan.controller_id, fan.port_num, test_pwm)
+        time.sleep(1)
+        finishing_rpm = []
+        for fan in fans:
+            if fan.active:
+                ret = tty.command_write(tty.cmd.RPM, fan.controller_id, fan.port_num)
+                finishing_rpm.append(int(ret.data))
+                tty.command_write(tty.cmd.PWM, fan.controller_id, fan.port_num, fan.pwm)
+        rpm_delta = [abs(x-y) for x, y in list(zip(starting_rpm, finishing_rpm))]
+        db.session.flush()  # flush to populate autoincrement id
+        for i, fan in enumerate([fan for fan in fans if fan.active]):
+            if rpm_delta[i] > FOUR_PIN_RPM_DEVIATION:
+                fan.four_pin = True
+                helpers.cascade_add_setpoints(f.id)
+        db.session.commit()
