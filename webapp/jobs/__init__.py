@@ -525,6 +525,7 @@ def cascade_controller_fan(controller_id: int):
         starting_rpm = []
         for fan in fans:
             ret = tty.command_write(tty.cmd.RPM, fan.controller_id, fan.port_num)
+            time.sleep(0.1)
             if int(ret.data) == 0:
                 fan.active = False
                 continue
@@ -536,6 +537,7 @@ def cascade_controller_fan(controller_id: int):
         for fan in fans:
             if fan.active:
                 ret = tty.command_write(tty.cmd.RPM, fan.controller_id, fan.port_num)
+                time.sleep(1)
                 finishing_rpm.append(int(ret.data))
                 tty.command_write(tty.cmd.PWM, fan.controller_id, fan.port_num, DEFAULT_FAN_PWM)
                 fan.pwm = DEFAULT_FAN_PWM
