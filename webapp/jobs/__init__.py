@@ -529,7 +529,7 @@ def cascade_controller_fan(controller_id: int):
                 fan.active = False
                 continue
             starting_rpm.append(int(ret.data))
-            test_pwm = fan.pwm - 10 if fan.pwm + 10 > MAX_FAN_PWM else fan.pwm + 10
+            test_pwm = DEFAULT_FAN_PWM - 10 if DEFAULT_FAN_PWM + 10 > MAX_FAN_PWM else DEFAULT_FAN_PWM + 10
             tty.command_write(tty.cmd.PWM, fan.controller_id, fan.port_num, test_pwm)
         time.sleep(1)
         finishing_rpm = []
@@ -537,7 +537,8 @@ def cascade_controller_fan(controller_id: int):
             if fan.active:
                 ret = tty.command_write(tty.cmd.RPM, fan.controller_id, fan.port_num)
                 finishing_rpm.append(int(ret.data))
-                tty.command_write(tty.cmd.PWM, fan.controller_id, fan.port_num, fan.pwm)
+                tty.command_write(tty.cmd.PWM, fan.controller_id, fan.port_num, DEFAULT_FAN_PWM)
+                fan.pwm = DEFAULT_FAN_PWM
         rpm_delta = [abs(x-y) for x, y in list(zip(starting_rpm, finishing_rpm))]
         db.session.flush()  # flush to populate autoincrement id
         for i, fan in enumerate([fan for fan in fans if fan.active]):
