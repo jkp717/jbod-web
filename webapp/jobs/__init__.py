@@ -329,7 +329,7 @@ def _poll_controller_data() -> None:
             db.session.commit()
 
 
-def fan_calibration(fan_id: int) -> None:
+def fan_calibration(fan_id: Union[int, str]) -> None:
     """
     Ran to determine fan RPM to PWM curve. Should only run
     once when a fan is installed or when the fan RPM curve
