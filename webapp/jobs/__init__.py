@@ -547,4 +547,6 @@ def cascade_controller_fan(controller_id: int):
             if rpm_delta[i] > FOUR_PIN_RPM_DEVIATION:
                 fan.four_pin = True
                 helpers.cascade_add_setpoints(f.id)
+        for fan in fans:
+            db.session.add(fan)
         db.session.commit()
