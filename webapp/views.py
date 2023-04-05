@@ -16,6 +16,7 @@ from webapp.models import db, PhySlot, FanSetpoint, Fan, Controller, SysConfig, 
 from webapp.jobs import scheduler, query_disk_properties, query_controller_properties, \
     truenas_connection_info, get_console, ping_controllers, console_connection_check, activate_sys_job
 from webapp.jobs.events import fan_calibration_job_listener
+from webapp.console import JBODConsoleException
 
 
 class JBODBaseView(ModelView):
@@ -157,25 +158,24 @@ class FanView(JBODBaseView):
     ]
     column_editable_list = ['description', 'pwm']
     form_excluded_columns = JBODBaseView.form_excluded_columns + [
-        'setpoints', 'rpm', 'active', 'four_pin', 'port_num', 'controller', 'min_rpm', 'max_rpm',
-        'calibration_job_uuid', 'calibration_status', 'pwm', 'rpm_deviation'
+       'setpoints', 'rpm', 'active', 'four_pin', 'port_num', 'controller', 'min_rpm', 'max_rpm',
+       'calibration_job_uuid', 'calibration_status', 'pwm', 'rpm_deviation'
     ]
     form_rules = [rules.Header('Fan Setpoints')]
     column_filters = ['controller.id', 'controller.chassis', 'controller.chassis.id', 'rpm', 'active']
     column_extra_row_actions = [helpers.FanCalibrationRowAction()]
 
     def on_model_change(self, form, model, is_created):
-        old_model = helpers.get_model_by_id(Fan, model.id)
-        # check for changing PWM value
-        if old_model.pwm != model.pwm:
+        if not is_created and form.__contains__('pwm'):
             tty = get_console()
             if tty:
-                tty.command_write(tty.cmd.PWM, Fan.controller_id, model.pwm)
-                current_app.logger.info(f"Manually adjusting PWM value on fan {model.id} to {model.pwm}")
+                try:
+                    tty.command_write(tty.cmd.PWM, Fan.controller_id, model.pwm)
+                    current_app.logger.info(f"Manually adjusting PWM value on fan {model.id} to {model.pwm}")
+                except JBODConsoleException as err:
+                    current_app.logger.error(f"Error while changing pwm value: {err}")
             else:
                 current_app.logger.error("Cannot adjust PWM; no controllers are currently connected!")
-                model.pwm = old_model.pwm
-                db.session.commit()
 
     @expose('/calibrate/', methods=['GET'])
     def calibrate(self):
