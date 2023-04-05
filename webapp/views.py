@@ -502,7 +502,7 @@ class ControllerView(JBODBaseView):
                     return redirect(self.get_url('.index_view')), 500
                 db.session.add(c_model)
                 # setup job to test connected fans & populate db
-                db.session.flush()
+                db.session.commit()
                 job_uuid = uuid.uuid4()
                 cascade_fan_job = {
                     "id": str(job_uuid),
@@ -513,7 +513,6 @@ class ControllerView(JBODBaseView):
                     # omit trigger to run immediately
                 }
                 scheduler.add_job(**cascade_fan_job)
-            db.session.commit()
             # Turn on controller data polling job (if not already)
             activate_sys_job('poll_controller_data')
         if request.is_json:
