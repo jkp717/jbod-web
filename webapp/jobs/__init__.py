@@ -521,7 +521,7 @@ def cascade_controller_fan(controller_id: int):
         tty = get_console()
         fans = []
         for i in range(model.fan_port_cnt):
-            f = Fan(id=uuid.uuid4(), controller_id=model.id, port_num=i+1)
+            f = Fan(id=str(uuid.uuid4()), controller_id=model.id, port_num=i+1)
             db.session.add(f)
             fans.append(f)
         db.session.commit()
