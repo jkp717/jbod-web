@@ -279,7 +279,7 @@ class JBODConsole:
         b.extend(self.TERMINATOR)  # add terminator to end of bytearray
         with self._lock:
             self.serial.write(bytes(b))  # convert bytearray to bytes
-        resp = JBODRxData(self.receive_now())
+            resp = JBODRxData(self.receive_now())
         if not resp.ack:
             raise JBODConsoleAckException(
                 command_req=fmt_command,
