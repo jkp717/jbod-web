@@ -506,14 +506,14 @@ class ControllerView(JBODBaseView):
                 db.session.flush()
                 new_models.append(c_model)
             db.session.commit()
-            for new_c in new_models:
+            for mdl in new_models:
                 job_uuid = uuid.uuid4()
                 cascade_fan_job = {
                     "id": str(job_uuid),
                     "name": "cascade_controller_fan",
                     "func": "webapp.jobs:cascade_controller_fan",
                     "replace_existing": True,
-                    "args": (new_c.id,),
+                    "args": (mdl.id,),
                     # omit trigger to run immediately
                 }
                 scheduler.add_job(**cascade_fan_job)
