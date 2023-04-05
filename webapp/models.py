@@ -285,7 +285,7 @@ class Controller(db.Model):
 
 class Fan(db.Model):
     __tablename__ = "fan"
-    id = db.Column(db.String, primary_key=True, default=uuid.uuid4)
+    id = db.Column(db.String, primary_key=True)
     controller_id = db.Column(db.Integer, db.ForeignKey("controller.id"))
     port_num = db.Column(db.Integer)
     description = db.Column(db.String)

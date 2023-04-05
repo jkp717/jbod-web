@@ -1,6 +1,7 @@
 import time
 import logging
 import json
+import uuid
 from datetime import datetime, timedelta
 from typing import Optional, Union
 from flask import current_app
@@ -520,9 +521,8 @@ def cascade_controller_fan(controller_id: int):
         tty = get_console()
         fans = []
         for i in range(model.fan_port_cnt):
-            f = Fan(controller_id=model.id, port_num=i+1)
+            f = Fan(id=uuid.uuid4(), controller_id=model.id, port_num=i+1)
             db.session.add(f)
-            db.session.flush()
             fans.append(f)
         db.session.commit()
         starting_rpm = []
