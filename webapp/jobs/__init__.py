@@ -528,15 +528,15 @@ def cascade_controller_fan(controller_id: int):
         starting_rpm = []
         for fan in fans:
             ret = tty.command_write(tty.cmd.RPM, fan.controller_id, fan.port_num)
+            fan.rpm = int(ret.data)
             if int(ret.data) == 0:
                 fan.active = False
                 continue
             fan.active = True
             starting_rpm.append(int(ret.data))
-            test_pwm = fan.pwm - 10 if fan.pwm + 10 > MAX_FAN_PWM else fan.pwm + 10
-            tty.command_write(tty.cmd.PWM, fan.controller_id, fan.port_num, test_pwm)
+            tty.command_write(tty.cmd.PWM, fan.controller_id, fan.port_num, MAX_FAN_PWM)
         db.session.commit()
-        time.sleep(1)
+        time.sleep(0.5)
         finishing_rpm = []
         for fan in fans:
             if fan.active:
