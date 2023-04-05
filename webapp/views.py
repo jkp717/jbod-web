@@ -170,7 +170,7 @@ class FanView(JBODBaseView):
             tty = get_console()
             if tty:
                 try:
-                    tty.command_write(tty.cmd.PWM, Fan.controller_id, model.pwm)
+                    tty.command_write(tty.cmd.PWM, model.controller_id, model.port_num, model.pwm)
                     current_app.logger.info(f"Manually adjusting PWM value on fan {model.id} to {model.pwm}")
                 except JBODConsoleException as err:
                     current_app.logger.error(f"Error while changing pwm value: {err}")
