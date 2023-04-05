@@ -8,6 +8,7 @@ from flask import current_app
 from sqlalchemy.sql import text
 from flask_apscheduler import APScheduler
 from serial import SerialException, serial_for_url
+from apscheduler.job import Job
 from webapp.models import db, SysConfig, Disk, DiskTemp, Chassis, Fan, FanSetpoint, Controller, PhySlot, SysJob
 from webapp.console import JBODCommand, JBODConsole, JBODConsoleException, JBODRxData, ResetEvent
 from webapp import helpers
@@ -19,13 +20,15 @@ scheduler = APScheduler()
 _logger = logging.getLogger("apscheduler_jobs")
 
 
-def activate_sys_job(job_id: Union[str, int]):
+def activate_sys_job(job_id: Union[str, int]) -> Job:
     with current_app.app_context():
         job = db.session.query(SysJob).where(SysJob.job_id == job_id).first()
         if not job.active:
-            scheduler.add_job(**job.job_dict)
+            aps_job = scheduler.add_job(**job.job_dict)
             job.active = True
             db.session.commit()
+            return aps_job
+        return scheduler.get_job(job_id)
 
 
 def get_console() -> Union[JBODConsole, None]:
@@ -521,8 +524,9 @@ def cascade_controller_fan(controller_id: int):
         tty = get_console()
         fans = []
         for i in range(model.fan_port_cnt):
-            f = Fan(id=str(uuid.uuid4()), controller_id=model.id, port_num=i+1)
+            f = Fan(controller_id=model.id, port_num=i+1)
             db.session.add(f)
+            db.session.flush()
             fans.append(f)
         db.session.commit()
         starting_rpm = []
@@ -549,5 +553,5 @@ def cascade_controller_fan(controller_id: int):
         for i, fan in enumerate([fan for fan in fans if fan.active]):
             if rpm_delta[i] > FOUR_PIN_RPM_DEVIATION:
                 fan.four_pin = True
-                helpers.cascade_add_setpoints(f.id)
+                helpers.cascade_add_setpoints(fan.id)
         db.session.commit()

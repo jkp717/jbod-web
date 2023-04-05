@@ -205,24 +205,6 @@ def resolve_string_attr(obj: object, attr: str, level: int = None) -> Union[list
             obj = obj.get(name)
     return obj
 
-
-def cascade_controller_fan(model: Controller, *args, **kwargs):
-    db_fans = db.session.query(db.func.count(Fan.id)).where(Fan.controller_id == model.id).first()[0]
-    if db_fans < model.fan_port_cnt:
-        for i in range(db_fans, model.fan_port_cnt):
-            db.session.flush()  # flush to populate autoincrement id
-            f = Fan(controller_id=model.id, port_num=i+1)
-            db.session.add(f)
-            cascade_add_setpoints(f.id)  # create default setpoints for new fans
-    elif db_fans > model.fan_port_cnt:
-        del_rows = db.session.query(Fan) \
-            .filter(Fan.port_num > model.fan_port_cnt, Fan.controller_id == model.id) \
-            .all()
-        for row in del_rows:
-            db.session.delete(row)
-        db.session.commit()
-
-
 class AlertLogHandler(logging.Handler):
 
     def __init__(self, alert_model, app_context: Flask, db_session):

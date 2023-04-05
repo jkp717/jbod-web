@@ -285,7 +285,7 @@ class Controller(db.Model):
 
 class Fan(db.Model):
     __tablename__ = "fan"
-    id = db.Column(db.String, primary_key=True)
+    id = db.Column(db.Integer, primary_key=True)
     controller_id = db.Column(db.Integer, db.ForeignKey("controller.id"))
     port_num = db.Column(db.Integer)
     description = db.Column(db.String)
@@ -331,7 +331,7 @@ db.event.listen(Fan.__table__, 'after_create', update_fan_active_trigger)
 class FanSetpoint(db.Model):
     __tablename__ = "fan_setpoint"
     id = db.Column(db.Integer, primary_key=True)
-    fan_id = db.Column(db.String, db.ForeignKey("fan.id"))
+    fan_id = db.Column(db.Integer, db.ForeignKey("fan.id"))
     pwm = db.Column(db.Integer)
     temp = db.Column(db.Integer)
     fan = db.relationship('Fan', back_populates='setpoints')

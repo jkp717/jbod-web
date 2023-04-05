@@ -216,8 +216,6 @@ class FanView(JBODBaseView):
             })
         if fan.calibration_status == helpers.StatusFlag.COMPLETE:
             # add default setpoints to PWM Fans
-            if fan.four_pin:
-                helpers.cascade_add_setpoints(fan_id)
             return jsonify({
                 "status": helpers.StatusFlag.COMPLETE,
                 "message": Markup(f"""Fan calibration complete! 
@@ -415,9 +413,6 @@ class ControllerView(JBODBaseView):
                 db.session.delete(row)
             db.session.commit()
 
-    def on_model_change(self, form, model, is_created):
-        helpers.cascade_controller_fan(model, form, is_created)
-
     @expose('/identify/<controller_id>', methods=['GET'])
     def identify(self, controller_id):
         """
@@ -512,7 +507,7 @@ class ControllerView(JBODBaseView):
                     "id": str(job_uuid),
                     "name": "cascade_controller_fan",
                     "func": "webapp.jobs:cascade_controller_fan",
-                    "replace_existing": True,
+                    "replace_existing": False,
                     "args": (mdl.id,),
                     # omit trigger to run immediately
                 }
