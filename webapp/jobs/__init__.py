@@ -536,6 +536,7 @@ def cascade_controller_fan(controller_id: int):
             starting_rpm.append(int(ret.data))
             tty.command_write(tty.cmd.PWM, fan.controller_id, fan.port_num, MAX_FAN_PWM)
         db.session.commit()
+        _logger.debug(f"cascade_fan: starting_rpm: {starting_rpm}")
         time.sleep(0.5)
         finishing_rpm = []
         for fan in fans:
@@ -544,6 +545,7 @@ def cascade_controller_fan(controller_id: int):
                 finishing_rpm.append(int(ret.data))
                 tty.command_write(tty.cmd.PWM, fan.controller_id, fan.port_num, fan.pwm)
         rpm_delta = [abs(x-y) for x, y in list(zip(starting_rpm, finishing_rpm))]
+        _logger.debug(f"cascade_fan: finishing_rpm: {finishing_rpm}; delta: {rpm_delta}")
         for i, fan in enumerate([fan for fan in fans if fan.active]):
             if rpm_delta[i] > FOUR_PIN_RPM_DEVIATION:
                 fan.four_pin = True
