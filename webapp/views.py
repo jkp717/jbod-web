@@ -1,28 +1,28 @@
 import uuid
+
 import serial
+from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 from flask import current_app, jsonify, request, redirect, flash, Markup
 from flask_admin import expose, BaseView
-from flask_admin.form import rules
 from flask_admin.contrib.sqla import ModelView
+from flask_admin.form import rules
 from flask_admin.model.template import LinkRowAction
-
-from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
-from wtforms.widgets import PasswordInput
 from requests.exceptions import MissingSchema
 from serial.tools.list_ports import comports
+from wtforms.widgets import PasswordInput
 
-from webapp import helpers
-from webapp.models import db, PhySlot, FanSetpoint, Fan, Controller, SysConfig, Chassis, SysJob, Alert
+from webapp import utils
+from webapp.console import JBODConsoleException
 from webapp.jobs import scheduler, query_disk_properties, query_controller_properties, \
     truenas_connection_info, get_console, ping_controllers, console_connection_check, activate_sys_job
 from webapp.jobs.events import fan_calibration_job_listener
-from webapp.console import JBODConsoleException
+from webapp.models import db, PhySlot, FanSetpoint, Fan, Controller, SysConfig, Chassis, SysJob, Alert
 
 
 class JBODBaseView(ModelView):
     form_excluded_columns = ['create_date', 'modify_date']
     column_exclude_list = form_excluded_columns
-    column_type_formatters = helpers.get_config_formatters()
+    column_type_formatters = utils.get_config_formatters()
     named_filter_urls = True
     can_view_details = True
 
@@ -40,7 +40,7 @@ class IndexView(BaseView):
         setup_required = {
             'truenas': truenas_connection_info() is not None,
             'controller': console_connection_check(),
-            'chassis': helpers.get_model_by_id(Chassis, 1) is not None,
+            'chassis': utils.get_model_by_id(Chassis, 1) is not None,
             'jobs': db.session.query(SysJob).where(SysJob.active == False).all() is None,  # noqa
         }
         jbods = db.session.query(Chassis).where(Chassis.controller_id is not None).all()  # noqa
@@ -158,12 +158,12 @@ class FanView(JBODBaseView):
     ]
     column_editable_list = ['description', 'pwm']
     form_excluded_columns = JBODBaseView.form_excluded_columns + [
-       'setpoints', 'rpm', 'active', 'four_pin', 'port_num', 'controller', 'min_rpm', 'max_rpm',
-       'calibration_job_uuid', 'calibration_status', 'pwm'
+        'setpoints', 'rpm', 'active', 'four_pin', 'port_num', 'controller', 'min_rpm', 'max_rpm',
+        'calibration_job_uuid', 'calibration_status', 'pwm'
     ]
     form_rules = [rules.Header('Fan Setpoints')]
     column_filters = ['controller.id', 'controller.chassis', 'controller.chassis.id', 'rpm', 'active']
-    column_extra_row_actions = [helpers.FanCalibrationRowAction()]
+    column_extra_row_actions = [utils.FanCalibrationRowAction()]
 
     def on_model_change(self, form, model, is_created):
         if not is_created and form.__contains__('pwm'):
@@ -191,9 +191,9 @@ class FanView(JBODBaseView):
             "args": (fan_id,),
             # omit trigger to run immediately
         }
-        fan = helpers.get_model_by_id(Fan, int(fan_id))
+        fan = utils.get_model_by_id(Fan, int(fan_id))
         fan.calibration_job_uuid = str(job_uuid)
-        fan.calibration_status = helpers.StatusFlag.RUNNING
+        fan.calibration_status = utils.StatusFlag.RUNNING
         db.session.commit()
         scheduler.add_job(**calibration_job)
         # fan_calibration_job_listener removes itself once job is complete
@@ -205,30 +205,30 @@ class FanView(JBODBaseView):
         fan_id = int(request.args.get('id'))
         if not fan_id:
             return jsonify({
-                "status": helpers.StatusFlag.ERROR,
+                "status": utils.StatusFlag.ERROR,
                 "message": "Fan ID required"
             }), 400
-        fan = helpers.get_model_by_id(Fan, fan_id)
-        if fan.calibration_status == helpers.StatusFlag.RUNNING:
+        fan = utils.get_model_by_id(Fan, fan_id)
+        if fan.calibration_status == utils.StatusFlag.RUNNING:
             return jsonify({
-                "status": helpers.StatusFlag.RUNNING,
+                "status": utils.StatusFlag.RUNNING,
                 "message": "Warning: Calibration is taking longer than expected to complete."
             })
-        if fan.calibration_status == helpers.StatusFlag.COMPLETE:
+        if fan.calibration_status == utils.StatusFlag.COMPLETE:
             # add default setpoints to PWM Fans
             return jsonify({
-                "status": helpers.StatusFlag.COMPLETE,
+                "status": utils.StatusFlag.COMPLETE,
                 "message": Markup(f"""Fan calibration complete! 
                     <a href="{self.get_url('.index_view')}" class="alert-link">Reload </a>to see results.
             """)
             })
-        if fan.calibration_status == helpers.StatusFlag.FAIL:
+        if fan.calibration_status == utils.StatusFlag.FAIL:
             return jsonify({
-                "status": helpers.StatusFlag.FAIL,
+                "status": utils.StatusFlag.FAIL,
                 "message": "Fan Calibration failed! Check the logs and try again."
             })
         return jsonify({
-            "status": int(helpers.StatusFlag.UNKNOWN),
+            "status": int(utils.StatusFlag.UNKNOWN),
             "message": "Oops! Fan calibration status is unknown."
         })
 
@@ -282,7 +282,7 @@ class SetpointView(JBODBaseView):
     def delete_one(self):
         if request.method == 'POST':
             content = request.get_json(force=True)
-            sp = helpers.get_model_by_id(FanSetpoint, int(content['id']))
+            sp = utils.get_model_by_id(FanSetpoint, int(content['id']))
             db.session.delete(sp)
             db.session.commit()
             return jsonify({'result': 'success'}), 200
@@ -296,7 +296,7 @@ class SetpointView(JBODBaseView):
     def on_model_change(self, form, model, is_created):
         if 'fan_id' in request.args.keys():
             fid = request.args.get('fan_id')
-            fan_model = helpers.get_model_by_id(Fan, fid)
+            fan_model = utils.get_model_by_id(Fan, fid)
             fan_setpoints = db.session.query(FanSetpoint) \
                 .where(FanSetpoint.fan_id == fid) \
                 .order_by(FanSetpoint.temp) \
@@ -306,7 +306,7 @@ class SetpointView(JBODBaseView):
                 raise ValueError(f"Unable to update setpoint model for fan_id = {fid}")
             else:
                 model.pwm = max(sp.pwm for sp in fan_setpoints if sp.temp < model.temp) + 1 \
-                    or min(sp.pwm for sp in fan_setpoints) + 1
+                            or min(sp.pwm for sp in fan_setpoints) + 1
                 model.fan_id = fid
                 db.session.add(model)
                 db.session.commit()
@@ -327,7 +327,8 @@ class DiskView(JBODBaseView):
         'serial', 'zfs_pool', 'model', 'size', 'type', 'bus', 'phy_slot', 'temperature',
         'last_temp_reading', 'last_update'
     ]
-    column_formatters = {'size': helpers.disk_size_formatter}
+    column_formatters = {'size': utils.disk_size_formatter}
+
     # form_excluded_columns = JBODBaseView.form_excluded_columns + ['disk_temps', ]
 
     def get_empty_list_message(self):
@@ -359,7 +360,7 @@ class ChassisView(JBODBaseView):
         'name', 'slot_cnt', 'populated_slots', 'active_fans', 'psu_on', 'last_update'
     ]
     column_formatters = {
-        'populated_slots': helpers.disk_link_formatter,
+        'populated_slots': utils.disk_link_formatter,
     }
     column_extra_row_actions = [
         LinkRowAction('mdl-fan', '/fan/?flt1_controller_chassis_id_equals={row_id}'),
@@ -398,8 +399,8 @@ class ControllerView(JBODBaseView):
     refresh_view = '.broadcast'
     list_template = 'refresh_list.html'
     column_list = ['id', 'mcu_device_id', 'firmware_version', 'fan_port_cnt', 'psu_on', 'alive']
-    column_formatters = {'id': helpers.controller_id_formatter}
-    column_extra_row_actions = [helpers.ControllerAlarmRowAction(), helpers.ControllerLEDRowAction()]
+    column_formatters = {'id': utils.controller_id_formatter}
+    column_extra_row_actions = [utils.ControllerAlarmRowAction(), utils.ControllerLEDRowAction()]
 
     def get_empty_list_message(self):
         return Markup(f"<a href={self.get_url('.broadcast')}>Search for connected Controllers</a>")
@@ -479,11 +480,11 @@ class ControllerView(JBODBaseView):
         ack_c = set(db_ids).intersection(set(r_ids))
         # update existing alive controllers
         for alive_id in ack_c:
-            ca = helpers.get_model_by_id(Controller, alive_id)
+            ca = utils.get_model_by_id(Controller, alive_id)
             ca.alive = True
         # update dead controllers
         for old_id in dead_c:
-            cd = helpers.get_model_by_id(Controller, old_id)
+            cd = utils.get_model_by_id(Controller, old_id)
             if request.args.get('action') == 'delete':
                 db.session.delete(cd)
             else:
@@ -568,7 +569,7 @@ class AlertView(JBODBaseView):
                 db.session.delete(alert)
             db.session.commit()
             return jsonify({"result": "success"}), 200
-        alert = helpers.get_model_by_id(Alert, int(alert_id))
+        alert = utils.get_model_by_id(Alert, int(alert_id))
         if not alert:
             return jsonify({"result": "error", "msg": f"alert {alert_id} not found."}), 400
         db.session.delete(alert)

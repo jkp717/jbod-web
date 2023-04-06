@@ -98,7 +98,7 @@ def create_app(dev=False):
 
     from webapp import jobs
     from webapp.models import db, SysConfig, SysJob, Alert
-    from webapp import helpers
+    from webapp import utils
 
     # initialize flask addons
     db.init_app(app)
@@ -125,11 +125,11 @@ def create_app(dev=False):
                     db.session.rollback()
 
         # setup logger
-        log_path = helpers.get_config_value('log_path')
+        log_path = utils.get_config_value('log_path')
         if not log_path:
             log_path = os.path.normpath(os.path.join(app.instance_path, 'jbod.log'))
         setup_logger(file_path=log_path, app_instance=app, level=app.config['LOGGING_LEVEL'])
-        alert_handler = helpers.AlertLogHandler(alert_model=Alert, app_context=app, db_session=db.session)
+        alert_handler = utils.AlertLogHandler(alert_model=Alert, app_context=app, db_session=db.session)
         alert_handler.setLevel(logging.WARNING)  # prevent overflow of alerts
         app.logger.addHandler(alert_handler)
 
@@ -161,8 +161,7 @@ def create_app(dev=False):
     # add custom functions to jinja environment
     app.jinja_env.globals.update(truenas_connection_info=jobs.truenas_connection_info)
     app.jinja_env.globals.update(get_serial_connection=jobs.console_connection_check)
-    app.jinja_env.globals.update(disk_tooltip_html=helpers.disk_tooltip_html)
-    app.jinja_env.globals.update(svg_html_converter=helpers.svg_html_converter)
-    app.jinja_env.globals.update(get_alerts=helpers.get_alerts)
+    app.jinja_env.globals.update(disk_tooltip_html=utils.disk_tooltip_html)
+    app.jinja_env.globals.update(svg_html_converter=utils.svg_html_converter)
+    app.jinja_env.globals.update(get_alerts=utils.get_alerts)
     return app
-

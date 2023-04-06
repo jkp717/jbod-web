@@ -1,19 +1,18 @@
-import os
-import math
 import logging
-import requests
-from typing import Optional, Iterable, Union
+import math
+import os
+from datetime import datetime
 from enum import IntEnum
+from typing import Optional, Iterable, Union
+
+import requests
 from dateutil import tz
 from flask import Markup, current_app, Flask
 from flask_admin.helpers import url_for
-from datetime import datetime
 from flask_admin.model import typefmt
 from flask_admin.model.template import TemplateLinkRowAction
 
-from webapp.models import db, FanSetpoint, SysConfig, Disk, Controller, Fan, Alert
-
-from webapp.config import MAX_FAN_PWM, MIN_FAN_PWM
+from webapp.models import db, FanSetpoint, SysConfig, Disk, Alert
 
 
 class StatusFlag(IntEnum):
@@ -80,7 +79,7 @@ def svg_html_converter(path: str) -> str:
         return ""
 
 
-def disk_size_formatter(view, context, model, name):
+def disk_size_formatter(view, context, model, name):  # noqa
     size_bytes = getattr(model, name)
     if size_bytes == 0:
         return "0B"
@@ -91,7 +90,7 @@ def disk_size_formatter(view, context, model, name):
     return "%s %s" % (s, size_name[i])
 
 
-def disk_link_formatter(view, context, model, name):
+def disk_link_formatter(view, context, model, name):  # noqa
     filter_txt = 'flt0_physlot_chassis_name_equals'
     if getattr(model, name):
         return Markup(
@@ -100,17 +99,17 @@ def disk_link_formatter(view, context, model, name):
     return getattr(model, name)
 
 
-def datetime_formatter(view, value, name):
+def datetime_formatter(view, value, name):  # noqa
     with current_app.app_context():
         value = value.replace(tzinfo=tz.gettz('UTC'))
         return value.astimezone(tz.gettz(current_app.config['TIMEZONE'])).strftime('%m/%d/%Y %X')
 
 
-def byte_formatter(view, value, name):
+def byte_formatter(view, value, name):  # noqa
     return Markup("""&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;""")
 
 
-def psu_toggle_formatter(view, context, model, name):
+def psu_toggle_formatter(view, context, model, name):  # noqa
     # psu off
     if getattr(model, name):
         return Markup(
@@ -118,12 +117,12 @@ def psu_toggle_formatter(view, context, model, name):
         )
     # psu on
     return Markup(
-            f"""<a href='{url_for("chassis.psu_toggle")}?id={model.id}&state=OFF'>TURN-OFF</a>"""
-        )
+        f"""<a href='{url_for("chassis.psu_toggle")}?id={model.id}&state=OFF'>TURN-OFF</a>"""
+    )
 
 
-def controller_id_formatter(view, context, model, name):
-    txt = 'Master' if model.id == 1 else f'Slave({model.id-1})'
+def controller_id_formatter(view, context, model, name):  # noqa
+    txt = 'Master' if model.id == 1 else f'Slave({model.id - 1})'
     return Markup(txt)
 
 
@@ -149,11 +148,13 @@ def get_model_by_id(model, id: Union[str, int], column_name: Optional[str] = 'id
 def cascade_add_setpoints(fan_id: int):
     min_chassis_temp = int(get_config_value('min_chassis_temp'))
     max_chassis_temp = int(get_config_value('max_chassis_temp'))
-    mid_fan_pwm = round((int(MIN_FAN_PWM) + int(MAX_FAN_PWM)) / 2)
+    min_fan_pwm = int(get_config_value('min_fan_pwm'))
+    max_fan_pwm = int(get_config_value('max_fan_pwm'))
+    mid_fan_pwm = round((int(min_fan_pwm) + int(max_fan_pwm)) / 2)
     mid_chassis_temp = round((min_chassis_temp + max_chassis_temp) / 2)
-    db.session.add(FanSetpoint(fan_id=fan_id, pwm=int(MIN_FAN_PWM), temp=min_chassis_temp))
+    db.session.add(FanSetpoint(fan_id=fan_id, pwm=int(min_fan_pwm), temp=min_chassis_temp))
     db.session.add(FanSetpoint(fan_id=fan_id, pwm=mid_fan_pwm, temp=mid_chassis_temp))
-    db.session.add(FanSetpoint(fan_id=fan_id, pwm=int(MAX_FAN_PWM), temp=max_chassis_temp))
+    db.session.add(FanSetpoint(fan_id=fan_id, pwm=int(max_fan_pwm), temp=max_chassis_temp))
 
 
 def get_config_formatters() -> dict:
@@ -204,6 +205,7 @@ def resolve_string_attr(obj: object, attr: str, level: int = None) -> Union[list
         else:
             obj = obj.get(name)
     return obj
+
 
 class AlertLogHandler(logging.Handler):
 

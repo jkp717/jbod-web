@@ -1,7 +1,7 @@
 import logging
-from webapp import helpers, jobs
-from webapp.models import db, Fan, SysJob
 
+from webapp import utils, jobs
+from webapp.models import db, Fan, SysJob
 
 _logger = logging.getLogger('apscheduler_events')
 
@@ -13,9 +13,9 @@ def fan_calibration_job_listener(event):
         original_rpm = fan.rpm
         if fan:
             if event.exception:
-                fan.calibration_status = helpers.StatusFlag.FAIL
+                fan.calibration_status = utils.StatusFlag.FAIL
             else:
-                fan.calibration_status = helpers.StatusFlag.COMPLETE
+                fan.calibration_status = utils.StatusFlag.COMPLETE
             # set fan rpm so SQLAlchemy onupdate on 'active' column works correctly
             fan.rpm = original_rpm
             db.session.commit()
@@ -47,7 +47,7 @@ def job_added_listener(event):
             # must be a separate job b/c the dc2 request is sent in a separate thread and returned in callback
             job = db.session.query(SysJob).where(SysJob.job_id == getattr(event, 'job_id')).first()
             jobs.scheduler.add_job('_poll_controller_data', func="webapp.jobs:_poll_controller_data",
-                                   trigger='interval', seconds=job.seconds*2+1, minutes=job.minutes*2)
+                                   trigger='interval', seconds=job.seconds * 2 + 1, minutes=job.minutes * 2)
 
 
 def job_removed_listener(event):

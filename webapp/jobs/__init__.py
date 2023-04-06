@@ -1,19 +1,19 @@
-import time
-import logging
 import json
+import logging
+import time
 from datetime import datetime, timedelta
 from typing import Optional, Union
+
+from apscheduler.job import Job
 from flask import current_app
-from sqlalchemy.sql import text
 from flask_apscheduler import APScheduler
 from serial import SerialException, serial_for_url
-from apscheduler.job import Job
-from webapp.models import db, SysConfig, Disk, DiskTemp, Chassis, Fan, FanSetpoint, Controller, PhySlot, SysJob
-from webapp.console import JBODCommand, JBODConsole, JBODConsoleException, JBODRxData, ResetEvent
-from webapp import helpers
-from webapp.jobs import events as ev
-from webapp.config import MIN_FAN_PWM, MAX_FAN_PWM, DEFAULT_FAN_PWM, FOUR_PIN_RPM_DEVIATION
+from sqlalchemy.sql import text
 
+from webapp import utils
+from webapp.console import JBODCommand, JBODConsole, JBODConsoleException, JBODRxData, ResetEvent
+from webapp.jobs import events as ev
+from webapp.models import db, SysConfig, Disk, DiskTemp, Chassis, Fan, FanSetpoint, Controller, PhySlot, SysJob
 
 scheduler = APScheduler()
 _logger = logging.getLogger("apscheduler_jobs")
@@ -33,7 +33,7 @@ def activate_sys_job(job_id: Union[str, int]) -> Job:
 def get_console() -> Union[JBODConsole, None]:
     with current_app.app_context():
         if not getattr(current_app, 'console', None):
-            port = helpers.get_config_value('console_port')
+            port = utils.get_config_value('console_port')
             if not port:
                 # set console to None if port is not provided
                 current_app.__setattr__('console', None)
@@ -45,8 +45,8 @@ def get_console() -> Union[JBODConsole, None]:
                 tty = JBODConsole(
                     serial_for_url(
                         port,
-                        baudrate=int(helpers.get_config_value('baud_rate')),
-                        timeout=int(helpers.get_config_value('console_timeout')),
+                        baudrate=int(utils.get_config_value('baud_rate')),
+                        timeout=int(utils.get_config_value('console_timeout')),
                         do_not_open=True),
                     callback=console_callback,
                 )
@@ -97,7 +97,7 @@ def truenas_connection_info():
 
 def query_disk_properties() -> None:
     with scheduler.app.app_context():
-        resp = helpers.truenas_api_request('GET', '/api/v2.0/disk')
+        resp = utils.truenas_api_request('GET', '/api/v2.0/disk')
         if resp:
             zfs_props = _query_zfs_properties()
             for disk in resp.json():
@@ -124,7 +124,7 @@ def query_disk_temperatures() -> None:
         disks = db.session.query(Disk).all()
         if not disks:
             raise Exception("query_disk_temperatures scheduled job skipped. No disks to query.")
-        resp = helpers.truenas_api_request(
+        resp = utils.truenas_api_request(
             'POST',
             '/api/v2.0/disk/temperatures',
             headers={'Content-Type': 'application/json'},
@@ -142,7 +142,7 @@ def query_disk_temperatures() -> None:
 
 def _query_zfs_properties() -> dict:
     """Ran inside query disk properties job"""
-    resp = helpers.truenas_api_request('GET', '/api/v2.0/pool')
+    resp = utils.truenas_api_request('GET', '/api/v2.0/pool')
     if resp.status_code == 200:
         data = resp.json()
         disks = {}
@@ -150,10 +150,10 @@ def _query_zfs_properties() -> dict:
             # will return a list of attribute string paths to {type: DISK}
             # root path is zfs pool > topology > [data,log,cache,spare,special,dedup] > device
             # device path is index > children[] > device (can have multiple device hierarchies)
-            for path in list(helpers.json_path_generator('type', 'DISK', pool)):
+            for path in list(utils.json_path_generator('type', 'DISK', pool)):
                 disk_props = {}
                 # topology.data.0.children.0.type
-                disk = helpers.resolve_string_attr(pool, path)  # returns disk object
+                disk = utils.resolve_string_attr(pool, path)  # returns disk object
                 disk_props['zfs_pool'] = pool['name']
                 disk_props['zfs_topology'] = path.split('.')[1]
                 disk_props['zfs_device_path'] = disk['path']
@@ -168,7 +168,7 @@ def _query_zfs_properties() -> dict:
 
 def query_host_state() -> str:
     # states = ['BOOTING', 'READY', 'SHUTTING_DOWN']
-    resp = helpers.truenas_api_request('GET', '/api/v2.0/system/state')
+    resp = utils.truenas_api_request('GET', '/api/v2.0/system/state')
     if resp:
         return resp.text
     return 'UNKNOWN'
@@ -325,11 +325,150 @@ def _poll_controller_data() -> None:
             for c in ctrlr:
                 if not c.last_ds2:
                     pass
-                elif c.last_ds2 >= (datetime.utcnow() - timedelta(seconds=job.seconds*2, minutes=job.minutes*2)):
+                elif c.last_ds2 >= (datetime.utcnow() - timedelta(seconds=job.seconds * 2, minutes=job.minutes * 2)):
                     c.alive = True
                 else:
                     c.alive = False
             db.session.commit()
+
+
+def sound_controller_alarm(controller_id: int, duration: int = 3) -> None:
+    with scheduler.app.app_context():
+        tty = get_console()
+        if not tty:
+            raise SerialException("Serial connection not established.")
+        # 50 is the recommended duty cycle for piezo buzzer used
+        tty.command_write(JBODCommand.ALARM, controller_id, '50')
+        time.sleep(duration)
+        tty.command_write(JBODCommand.ALARM, controller_id, '00')
+
+
+def toggle_controller_led(controller_id: int, duration: int = 10) -> None:
+    with scheduler.app.app_context():
+        tty = get_console()
+        if not tty:
+            raise SerialException("Serial connection not established.")
+        # 50 is the recommended duty cycle for piezo buzzer used
+        tty.command_write(JBODCommand.LED_ON, controller_id, 2)
+        time.sleep(duration)
+        tty.command_write(JBODCommand.LED_OFF, controller_id, 2)
+
+
+def _truenas_shutdown(tty: JBODConsole):
+    with scheduler.app.app_context():
+        _logger.info("Shutdown request received from controller. "
+                     "Attempting to shutdown host now.")
+        resp = utils.truenas_api_request(
+            'POST',
+            '/api/v2.0/system/shutdown',
+            headers={'Content-Type': 'application/json'},
+            data={"delay": 0}
+        )
+        if resp.status_code == 200:
+            _logger.info("Host confirmed shutdown request. Shutting down...")
+            tty.command_write(tty.ctrlc.ACK)
+        else:
+            _logger.info("Host shutdown request failed! Attempting to cancel shutdown...")
+            # shutdown failed; send cancellation to all controllers
+            for controller in db.session.query(Controller).all():
+                try:
+                    tty.command_write(JBODCommand.CANCEL_SHUTDOWN, controller.id)
+                except JBODConsoleException:
+                    pass
+
+
+def console_callback(tty: JBODConsole, rx: JBODRxData):
+    """
+    Function called when data is received from controller that was not
+    requested by JBODConsole write_command
+    """
+    with scheduler.app.app_context():
+        if rx.xoff:
+            _truenas_shutdown(tty)
+        elif rx.xon:
+            _logger.warning("ACPI ON Event received but host is already on! %s", rx)
+        elif rx.dc2:
+            # Device Control 2 used to broadcast controller psu, rpm, and pwm data
+            # response example: {466-2038344B513050-19-1003:{psu:ON,rpm:[1000,1200,0,3000],pwm:[40,30,0,20]}}
+            _logger.debug("Attempting to parse rpm data: %s", rx.raw_data)
+            try:
+                resp = json.loads(rx.data.strip("\r\n\x00"))
+                ctrlr = db.session.query(Controller).where(Controller.mcu_device_id == resp['mcu']).first()
+                data = resp['data']
+                _logger.debug("Controller matched to ds2: %s", ctrlr)
+
+                # update psu status if needed
+                if (ctrlr.psu_on == True and data['psu'] != "ON") or (ctrlr.psu_on == False and data['psu'] == "ON"):
+                    ctrlr.psu_on = data['psu'] == "ON"
+                    _logger.info("psu status for %s updated to %s", ctrlr.mcu_device_id, ctrlr.psu_on)
+
+                # update fan(s) rpm and pwm values
+                for i, rpm in enumerate(data['rpm']):
+                    fan = db.session.query(Fan).where(Fan.controller_id == ctrlr.id, Fan.port_num == i + 1).first()
+                    if not fan:
+                        _logger.warning("Unable to find associated fan for rpm data: %s", rx)
+                    else:
+                        fan.pwm = data['pwm'][i]
+                        fan.rpm = int(rpm)
+                        _logger.debug("Stored fan[%s] rpm: %s", fan.id, fan.rpm)
+                ctrlr.last_ds2 = datetime.utcnow()
+                ctrlr.alive = True
+                db.session.commit()
+            except Exception as err:  # noqa
+                _logger.error("Unable to parse controller data: %s", rx)
+                _logger.error(err)
+        elif rx.dc4:
+            # misc controller event messages
+            msg_type, msg_body = rx.data.split(":")[0], rx.data.split(":")[1]
+            if msg_type == 'reset_event':
+                rst_code = ResetEvent(int(msg_body)).name
+                _logger.warning("Controller reset event: %s", rst_code)
+            else:
+                _logger.warning("Unknown ds4 event message received: %s", rx)
+        else:
+            _logger.warning("Uncaught console event received: %s", rx)
+
+
+def cascade_controller_fan(controller_id: int):
+    """checks if a four pin fan; should be called when controller is added"""
+    with scheduler.app.app_context():
+        FOUR_PIN_RPM_DEVIATION = int(utils.get_config_value('four_pin_rpm_deviation'))
+        MAX_FAN_PWM = int(utils.get_config_value('max_fan_pwm'))
+        model = utils.get_model_by_id(Controller, controller_id)
+        tty = get_console()
+        fans = []
+        for i in range(model.fan_port_cnt):
+            f = Fan(controller_id=model.id, port_num=i + 1)
+            db.session.add(f)
+            db.session.flush()
+            fans.append(f)
+        db.session.commit()
+        starting_rpm = []
+        for fan in fans:
+            ret = tty.command_write(tty.cmd.RPM, fan.controller_id, fan.port_num)
+            fan.rpm = int(ret.data)
+            if int(ret.data) == 0:
+                fan.active = False
+                continue
+            fan.active = True
+            starting_rpm.append(int(ret.data))
+            tty.command_write(tty.cmd.PWM, fan.controller_id, fan.port_num, MAX_FAN_PWM)
+        db.session.commit()
+        _logger.debug(f"cascade_fan: starting_rpm: {starting_rpm}")
+        time.sleep(0.5)
+        finishing_rpm = []
+        for fan in fans:
+            if fan.active:
+                ret = tty.command_write(tty.cmd.RPM, fan.controller_id, fan.port_num)
+                finishing_rpm.append(int(ret.data))
+                tty.command_write(tty.cmd.PWM, fan.controller_id, fan.port_num, fan.pwm)
+        rpm_delta = [abs(x - y) for x, y in list(zip(starting_rpm, finishing_rpm))]
+        _logger.debug(f"cascade_fan: finishing_rpm: {finishing_rpm}; delta: {rpm_delta}")
+        for i, fan in enumerate([fan for fan in fans if fan.active]):
+            if rpm_delta[i] > FOUR_PIN_RPM_DEVIATION:
+                fan.four_pin = True
+                utils.cascade_add_setpoints(fan.id)
+        db.session.commit()
 
 
 def fan_calibration(fan_id: Union[int, str]) -> None:
@@ -341,10 +480,15 @@ def fan_calibration(fan_id: Union[int, str]) -> None:
     max_wait_secs = 5  # max seconds to wait for rpm to normalize
     wait_secs = 0
     with scheduler.app.app_context():
+        # get config values
+        MIN_FAN_PWM = int(utils.get_config_value('min_fan_pwm'))
+        MAX_FAN_PWM = int(utils.get_config_value('max_fan_pwm'))
+        DEFAULT_FAN_PWM = int(utils.get_config_value('default_fan_pwm'))
+        # get console
         tty = get_console()
         if not tty:
             raise SerialException("Serial connection not established.")
-        fan_model = helpers.get_model_by_id(Fan, fan_id)
+        fan_model = utils.get_model_by_id(Fan, fan_id)
         psu_status = tty.command_write(JBODCommand.STATUS, fan_model.controller_id)
         if psu_status.data != 'ON':
             raise Exception(f"Controller {fan_model.controller_id} psu status is {psu_status.data}; "
@@ -391,7 +535,7 @@ def fan_calibration(fan_id: Union[int, str]) -> None:
                       f"New min rpm value is {round(new_rpm, -2)}")
         fan_model.max_rpm = round(new_rpm, -2)
         # define four pin
-        if fan_model.min_rpm in range(fan_model.max_rpm-100, fan_model.max_rpm+100):
+        if fan_model.min_rpm in range(fan_model.max_rpm - 100, fan_model.max_rpm + 100):
             fan_model.four_pin = False
         else:
             fan_model.four_pin = True
@@ -400,141 +544,4 @@ def fan_calibration(fan_id: Union[int, str]) -> None:
         tty.command_write(JBODCommand.PWM, fan_model.controller_id, fan_model.id, original_pwm)
         fan_model.rpm = original_rpm
         # commit changes to db
-        db.session.commit()
-
-
-def sound_controller_alarm(controller_id: int, duration: int = 3) -> None:
-    with scheduler.app.app_context():
-        tty = get_console()
-        if not tty:
-            raise SerialException("Serial connection not established.")
-        # 50 is the recommended duty cycle for piezo buzzer used
-        tty.command_write(JBODCommand.ALARM, controller_id, '50')
-        time.sleep(duration)
-        tty.command_write(JBODCommand.ALARM, controller_id, '00')
-
-
-def toggle_controller_led(controller_id: int, duration: int = 10) -> None:
-    with scheduler.app.app_context():
-        tty = get_console()
-        if not tty:
-            raise SerialException("Serial connection not established.")
-        # 50 is the recommended duty cycle for piezo buzzer used
-        tty.command_write(JBODCommand.LED_ON, controller_id, 2)
-        time.sleep(duration)
-        tty.command_write(JBODCommand.LED_OFF, controller_id, 2)
-
-
-def _truenas_shutdown(tty: JBODConsole):
-    with scheduler.app.app_context():
-        _logger.info("Shutdown request received from controller. "
-                     "Attempting to shutdown host now.")
-        resp = helpers.truenas_api_request(
-            'POST',
-            '/api/v2.0/system/shutdown',
-            headers={'Content-Type': 'application/json'},
-            data={"delay": 0}
-        )
-        if resp.status_code == 200:
-            _logger.info("Host confirmed shutdown request. Shutting down...")
-            tty.command_write(tty.ctrlc.ACK)
-        else:
-            _logger.info("Host shutdown request failed! Attempting to cancel shutdown...")
-            # shutdown failed; send cancellation to all controllers
-            for controller in db.session.query(Controller).all():
-                try:
-                    tty.command_write(JBODCommand.CANCEL_SHUTDOWN, controller.id)
-                except JBODConsoleException:
-                    pass
-
-
-def console_callback(tty: JBODConsole, rx: JBODRxData):
-    """
-    Function called when data is received from controller that was not
-    requested by JBODConsole write_command
-    """
-    with scheduler.app.app_context():
-        if rx.xoff:
-            _truenas_shutdown(tty)
-        elif rx.xon:
-            _logger.warning("ACPI ON Event received but host is already on! %s", rx)
-        elif rx.dc2:
-            # Device Control 2 used to broadcast controller psu, rpm, and pwm data
-            # response example: {466-2038344B513050-19-1003:{psu:ON,rpm:[1000,1200,0,3000],pwm:[40,30,0,20]}}
-            _logger.debug("Attempting to parse rpm data: %s", rx.raw_data)
-            try:
-                resp = json.loads(rx.data.strip("\r\n\x00"))
-                ctrlr = db.session.query(Controller).where(Controller.mcu_device_id == resp['mcu']).first()
-                data = resp['data']
-                _logger.debug("Controller matched to ds2: %s", ctrlr)
-
-                # update psu status if needed
-                if (ctrlr.psu_on == True and data['psu'] != "ON") or (ctrlr.psu_on == False and data['psu'] == "ON"):
-                    ctrlr.psu_on = data['psu'] == "ON"
-                    _logger.info("psu status for %s updated to %s", ctrlr.mcu_device_id, ctrlr.psu_on)
-
-                # update fan(s) rpm and pwm values
-                for i, rpm in enumerate(data['rpm']):
-                    fan = db.session.query(Fan).where(Fan.controller_id == ctrlr.id, Fan.port_num == i+1).first()
-                    if not fan:
-                        _logger.warning("Unable to find associated fan for rpm data: %s", rx)
-                    else:
-                        fan.pwm = data['pwm'][i]
-                        fan.rpm = int(rpm)
-                        _logger.debug("Stored fan[%s] rpm: %s", fan.id, fan.rpm)
-                ctrlr.last_ds2 = datetime.utcnow()
-                ctrlr.alive = True
-                db.session.commit()
-            except Exception as err:  # noqa
-                _logger.error("Unable to parse controller data: %s", rx)
-                _logger.error(err)
-        elif rx.dc4:
-            # misc controller event messages
-            msg_type, msg_body = rx.data.split(":")[0], rx.data.split(":")[1]
-            if msg_type == 'reset_event':
-                rst_code = ResetEvent(int(msg_body)).name
-                _logger.warning("Controller reset event: %s", rst_code)
-            else:
-                _logger.warning("Unknown ds4 event message received: %s", rx)
-        else:
-            _logger.warning("Uncaught console event received: %s", rx)
-
-
-def cascade_controller_fan(controller_id: int):
-    """checks if a four pin fan; should be called when controller is added"""
-    with scheduler.app.app_context():
-        model = helpers.get_model_by_id(Controller, controller_id)
-        tty = get_console()
-        fans = []
-        for i in range(model.fan_port_cnt):
-            f = Fan(controller_id=model.id, port_num=i+1)
-            db.session.add(f)
-            db.session.flush()
-            fans.append(f)
-        db.session.commit()
-        starting_rpm = []
-        for fan in fans:
-            ret = tty.command_write(tty.cmd.RPM, fan.controller_id, fan.port_num)
-            fan.rpm = int(ret.data)
-            if int(ret.data) == 0:
-                fan.active = False
-                continue
-            fan.active = True
-            starting_rpm.append(int(ret.data))
-            tty.command_write(tty.cmd.PWM, fan.controller_id, fan.port_num, MAX_FAN_PWM)
-        db.session.commit()
-        _logger.debug(f"cascade_fan: starting_rpm: {starting_rpm}")
-        time.sleep(0.5)
-        finishing_rpm = []
-        for fan in fans:
-            if fan.active:
-                ret = tty.command_write(tty.cmd.RPM, fan.controller_id, fan.port_num)
-                finishing_rpm.append(int(ret.data))
-                tty.command_write(tty.cmd.PWM, fan.controller_id, fan.port_num, fan.pwm)
-        rpm_delta = [abs(x-y) for x, y in list(zip(starting_rpm, finishing_rpm))]
-        _logger.debug(f"cascade_fan: finishing_rpm: {finishing_rpm}; delta: {rpm_delta}")
-        for i, fan in enumerate([fan for fan in fans if fan.active]):
-            if rpm_delta[i] > FOUR_PIN_RPM_DEVIATION:
-                fan.four_pin = True
-                helpers.cascade_add_setpoints(fan.id)
         db.session.commit()

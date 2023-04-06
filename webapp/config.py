@@ -2,19 +2,7 @@
 # Webapp Configurations
 #
 
-
-# Max should not be 100, controller only supports two digits
-MAX_FAN_PWM = 99
-
-# Lowest supported value by most PWM fans
-MIN_FAN_PWM = 20
-
-# Value set when PWM is not provided
 DEFAULT_FAN_PWM = 50
-
-# abs rpm difference after testing pwm +/- 10
-# fan is a four_pin if > this value
-FOUR_PIN_RPM_DEVIATION = 50
 
 # configuration defaults
 config_defaults = {
@@ -26,8 +14,13 @@ config_defaults = {
     'truenas_url': None,
     'max_chassis_temp': 65,
     'min_chassis_temp': 20,
-    'rpm_watchdog_window': 200,
-    'log_path': None
+    'max_fan_pwm': 99,
+    'min_fan_pwm': 20,
+    'default_fan_pwm': DEFAULT_FAN_PWM,
+    'log_path': None,
+    # abs rpm difference after testing pwm +/- 10
+    # fan is a four_pin if > this value
+    'four_pin_rpm_deviation': 50
 }
 
 # task scheduler defaults

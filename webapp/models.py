@@ -1,5 +1,4 @@
 import datetime
-import uuid
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.ext.hybrid import hybrid_property
 from webapp.config import DEFAULT_FAN_PWM
@@ -109,7 +108,7 @@ class Disk(db.Model):
         return None
 
     @last_temp_reading.expression
-    def last_temp_reading(cls):
+    def last_temp_reading(cls):  # noqa
         return (db.select(db.func.max(DiskTemp.create_date)).
                 where(DiskTemp.disk_serial == cls.serial).
                 label('last_temp_reading'))
@@ -125,7 +124,7 @@ class Disk(db.Model):
         return Celsius(0)
 
     @temperature.expression
-    def temperature(cls):
+    def temperature(cls):  # noqa
         return (db.select(DiskTemp.temp).
                 filter(DiskTemp.disk_serial == cls.serial, DiskTemp.create_date == cls.last_temp_reading).
                 label('temperature'))
@@ -189,7 +188,7 @@ class Chassis(db.Model):
         return sum([slot.disk is not None for slot in self.phy_slots if slot.chassis_id == self.id])
 
     @populated_slots.expression
-    def populated_slots(cls):
+    def populated_slots(cls):  # noqa
         return db.select(db.func.count(PhySlot.disk_id)).\
                 where(PhySlot.chassis_id == cls.id).\
                 label('populated_slots')
@@ -201,7 +200,7 @@ class Chassis(db.Model):
         return []
 
     @active_fans.expression
-    def active_fans(cls):
+    def active_fans(cls):  # noqa
         return db.select(db.func.count(Fan.id)).\
                 where(Fan.controller_id == cls.controller_id, Fan.active == True). \
                 label('active_fans')
@@ -215,7 +214,7 @@ class Chassis(db.Model):
         return 0
 
     @avg_disk_temp.expression
-    def avg_disk_temp(cls):
+    def avg_disk_temp(cls):  # noqa
         return db.select(db.func.avg(Disk.temperature)).\
                 where(Disk.chassis_id == cls.id).\
                 label('avg_disk_temp')
