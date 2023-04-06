@@ -5,7 +5,9 @@ from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 from flask import current_app, jsonify, request, redirect, flash, Markup
 from flask_admin import expose, BaseView
 from flask_admin.contrib.sqla import ModelView
-from flask_admin.form import rules
+from flask_admin.form import rules, FormOpts
+from flask_admin.helpers import get_redirect_target
+from flask_admin.model.base import get_mdict_item_or_list
 from flask_admin.model.template import LinkRowAction
 from requests.exceptions import MissingSchema
 from serial.tools.list_ports import comports
@@ -153,8 +155,9 @@ class SysConfigView(JBODBaseView):
 
 
 class FanView(JBODBaseView):
-    can_create = False
+    can_create = True
     can_delete = False
+    can_edit = False  # handled by a custom row action
     list_template = 'list.html'
     edit_template = 'fan/edit.html'
     column_list = ['controller', 'port_num', 'description', 'pwm', 'rpm', 'four_pin', 'active', 'logs']
@@ -164,13 +167,14 @@ class FanView(JBODBaseView):
         'calibration_job_uuid', 'calibration_status', 'pwm', 'logs'
     ]
     form_rules = [rules.Header('Fan Setpoints')]
+    column_display_actions = [utils.EditSetpointsRowAction(), utils.FanCalibrationRowAction()]
     column_filters = ['controller.id', 'controller.chassis', 'controller.chassis.id', 'rpm', 'active']
     column_details_list = [
         'pwm', 'rpm', 'active', 'four_pin', 'port_num', 'controller', 'controller.chassis', 'min_rpm', 'max_rpm',
         'calibration_job_uuid', 'calibration_status', 'logs'
     ]
     column_formatters = {'logs': utils.fan_log_formatter}
-    column_extra_row_actions = [utils.FanCalibrationRowAction()]
+    column_extra_row_actions = [utils.EditSetpointsRowAction(), utils.FanCalibrationRowAction()]
 
     def on_model_change(self, form, model, is_created):
         if not is_created and form.__contains__('pwm'):
@@ -183,6 +187,39 @@ class FanView(JBODBaseView):
                     current_app.logger.error(f"Error while changing pwm value: {err}")
             else:
                 current_app.logger.error("Cannot adjust PWM; no controllers are currently connected!")
+
+    @expose('/edit', methods=['GET'])
+    def edit_view(self):
+        """Override of the builtin edit_view"""
+        return_url = get_redirect_target() or self.get_url('.index_view')
+        id = get_mdict_item_or_list(request.args, 'id')
+        if id is None:
+            return redirect(return_url)
+        model = self.get_one(id)
+        if model is None:
+            flash('Record does not exist.', 'error')
+            return redirect(return_url)
+        form = self.edit_form(obj=model)
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:  # noqa
+            self._validate_form_instance(ruleset=self._form_edit_rules, form=form)
+        if self.validate_form(form):
+            if self.update_model(form, model):
+                flash('Record was successfully saved.', 'success')
+                if '_add_another' in request.form:
+                    return redirect(self.get_url('.create_view', url=return_url))
+                elif '_continue_editing' in request.form:
+                    return redirect(self.get_url('.edit_view', id=self.get_pk_value(model)))
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=False))
+        if request.method == 'GET' or form.errors:
+            self.on_form_prefill(form, id)
+        form_opts = FormOpts(widget_args=self.form_widget_args,form_rules=self._form_edit_rules)
+        if self.edit_modal and request.args.get('modal'):
+            template = self.edit_modal_template
+        else:
+            template = self.edit_template
+        return self.render(template, model=model, form=form, form_opts=form_opts, return_url=return_url)
 
     @expose('/calibrate/', methods=['GET'])
     def calibrate(self):

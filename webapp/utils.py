@@ -146,6 +146,11 @@ class FanCalibrationRowAction(TemplateLinkRowAction):
         super(FanCalibrationRowAction, self).__init__('custom_row_actions.fan_calibration')
 
 
+class EditSetpointsRowAction(TemplateLinkRowAction):
+    def __init__(self):
+        super(EditSetpointsRowAction, self).__init__('custom_row_actions.edit_setpoints')
+
+
 class ControllerAlarmRowAction(TemplateLinkRowAction):
     def __init__(self):
         super(ControllerAlarmRowAction, self).__init__('custom_row_actions.controller_alarm')
