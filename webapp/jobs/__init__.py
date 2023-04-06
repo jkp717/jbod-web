@@ -438,7 +438,7 @@ def cascade_controller_fan(controller_id: int):
     with scheduler.app.app_context():
         FOUR_PIN_RPM_DEVIATION = int(utils.get_config_value('four_pin_rpm_deviation'))
         MAX_FAN_PWM = int(utils.get_config_value('max_fan_pwm'))
-        RPM_READ_DELAY = int(utils.get_config_value('rpm_read_delay'))
+        RPM_READ_DELAY = float(utils.get_config_value('rpm_read_delay'))
         model = utils.get_model_by_id(Controller, controller_id)
         tty = get_console()
         fans = []
