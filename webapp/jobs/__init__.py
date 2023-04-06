@@ -195,14 +195,18 @@ def poll_setpoints() -> None:
             if not disks:
                 _logger.warning("No disks assigned to chassis %s, %s", jbod.name, jbod.id)
                 continue
-            fans = db.session.query(Fan).where(Fan.controller_id == jbod.controller.id).all()
+            fans = db.session.query(Fan).where(
+                Fan.controller_id == jbod.controller.id,
+                Fan.active == True,
+                Fan.four_pin == True
+            ).all()
+            if not fans:
+                _logger.warning(f"No active pwm fans found for {jbod.name} chassis; skipping poll_setpoints")
+                return
             temp_agg = max([int(d.last_temp_reading) for d in disks if str(d.last_temp_reading).isnumeric()])
             # get all setpoint models for each fan
             for fan in fans:
                 # skip fans that are not four pin (PWM)
-                if not fan.four_pin:
-                    _logger.debug("Skipping setpoint polling for fan %s; Not a PWM fan.", fan.id)
-                    continue
                 new_pwm = None
                 setpoints = db.session.query(FanSetpoint) \
                     .where(FanSetpoint.fan_id == fan.id) \
