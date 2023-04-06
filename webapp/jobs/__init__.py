@@ -19,7 +19,7 @@ scheduler = APScheduler()
 _logger = logging.getLogger("apscheduler_jobs")
 
 
-def activate_sys_job(job_id: Union[str, int]) -> Job:
+def activate_sys_job(job_id: Union[str, int]) -> Optional[Job]:
     with current_app.app_context():
         job = db.session.query(SysJob).where(SysJob.job_id == job_id).first()
         if not job.active:
@@ -27,7 +27,7 @@ def activate_sys_job(job_id: Union[str, int]) -> Job:
             job.active = True
             db.session.commit()
             return aps_job
-        return scheduler.get_job(job_id)
+        return None
 
 
 def get_console() -> Union[JBODConsole, None]:
@@ -438,6 +438,7 @@ def cascade_controller_fan(controller_id: int):
     with scheduler.app.app_context():
         FOUR_PIN_RPM_DEVIATION = int(utils.get_config_value('four_pin_rpm_deviation'))
         MAX_FAN_PWM = int(utils.get_config_value('max_fan_pwm'))
+        RPM_READ_DELAY = int(utils.get_config_value('rpm_read_delay'))
         model = utils.get_model_by_id(Controller, controller_id)
         tty = get_console()
         fans = []
@@ -459,7 +460,7 @@ def cascade_controller_fan(controller_id: int):
             tty.command_write(tty.cmd.PWM, fan.controller_id, fan.port_num, MAX_FAN_PWM)
         db.session.commit()
         _logger.debug(f"cascade_fan: starting_rpm: {starting_rpm}")
-        time.sleep(0.5)
+        time.sleep(RPM_READ_DELAY)
         finishing_rpm = []
         for fan in fans:
             if fan.active:
