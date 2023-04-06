@@ -298,6 +298,7 @@ class Fan(db.Model):
     calibration_status = db.Column(db.Integer)
     controller = db.relationship('Controller', back_populates='fans', uselist=False)
     setpoints = db.relationship('FanSetpoint', back_populates='fan', cascade="all, delete-orphan")
+    logs = db.relationship('FanLog', back_populates='fan', cascade="all, delete-orphan")
     create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
 
@@ -315,16 +316,6 @@ class Fan(db.Model):
 
     def __repr__(self):
         return f"Fan ID: {self.id}"
-
-
-# trigger used to manage 'active' column
-update_fan_active_trigger = db.DDL("""\
-CREATE TRIGGER update_fan_active_tr UPDATE OF rpm ON fan
-  BEGIN
-    UPDATE fan SET active = CASE WHEN NEW.rpm > 0 THEN 1 ELSE 0 END
-    WHERE id = NEW.id;
-  END;""")
-db.event.listen(Fan.__table__, 'after_create', update_fan_active_trigger)
 
 
 class FanSetpoint(db.Model):
@@ -349,6 +340,36 @@ class FanSetpoint(db.Model):
 
     def __repr__(self):
         return f"(Setpoint: {self.temp} | PWM: {self.pwm})"
+
+
+class FanLog(db.Model):
+    __tablename__ = "fan_log"
+    id = db.Column(db.Integer, primary_key=True)
+    fan_id = db.Column(db.Integer, db.ForeignKey("fan.id"))
+    old_pwm = db.Column(db.Integer)
+    new_pwm = db.Column(db.Integer)
+    fan = db.relationship('Fan', back_populates='logs')
+    create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
+
+    @hybrid_property
+    def last_update(self):
+        if self.modify_date:
+            return self.modify_date
+        return self.create_date
+
+    def __repr__(self):
+        if self.fan:
+            return f"{self.create_date}: PWM: {self.old_pwm} to {self.new_pwm}"
+
+
+update_fan_log_trigger = db.DDL("""\
+CREATE TRIGGER update_fan_active_tr UPDATE OF pwm ON fan
+  BEGIN
+    INSERT INTO fan_log (fan_id, old_pwm, new_pwm, create_date) 
+    VALUES (NEW.id, OLD.pwm, NEW.pwm, DATETIME('now','localtime'));
+  END;""")
+db.event.listen(Fan.__table__, 'after_create', update_fan_log_trigger)
 
 
 class Alert(db.Model):
