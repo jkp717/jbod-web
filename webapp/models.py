@@ -316,7 +316,7 @@ class Fan(db.Model):
 
     def __repr__(self):
         if self.controller:
-            return f"Fan: {self.port_num} | Controller: {self.controller.name or self.controller_uuid}"
+            return f"Fan: {self.port_num} | Controller: {self.controller.id}"
         return f"FanID: {self.id}"
 
 

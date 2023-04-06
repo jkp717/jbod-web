@@ -227,8 +227,8 @@ class JBODConsole:
                         self._data_received = bytearray()
                         retries = 0
                         # give time to process rx data (0.5 sec max)
-                        while retries < 5 and self.NEW_RX_DATA:
-                            time.sleep(0.1)
+                        while retries < 50 and self.NEW_RX_DATA:
+                            time.sleep(0.01)
                             retries += 1
                         # passing to callback if data has not been processed
                         if self._callback and self.NEW_RX_DATA:
@@ -320,8 +320,8 @@ class JBODConsole:
     def receive_now(self):
         """Blocking wait for receive"""
         retries = 0
-        # wait for new data (1 sec max)
-        while retries < 100 and not self.NEW_RX_DATA:
+        # wait for new data (0.5 sec max)
+        while retries < 50 and not self.NEW_RX_DATA:
             time.sleep(0.01)
             retries += 1
         if self.NEW_RX_DATA:
