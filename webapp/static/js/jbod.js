@@ -1,12 +1,14 @@
 $(function () {
-    // check for any disconnected children and update badge icon flag
-    if ($('#connStatusPopover').find('.popover-content-attr.disconnected').length > 0) {
-        $('#connStatusPopover').addClass('navbar-icon-alert');
-    } else {
-        $('#connStatusPopover').removeClass('navbar-icon-alert');
-    }
-})
-
+    // delay updating alert badge to give ws time to connect
+    setTimeout(function() {
+        // check for any disconnected children and update badge icon flag
+        if ($('#connStatusPopover').find('.popover-content-attr.disconnected').length > 0) {
+            $('#connStatusPopover').addClass('navbar-icon-alert');
+        } else {
+            $('#connStatusPopover').removeClass('navbar-icon-alert');
+        }
+    }, 1000);
+});
 
 function setupConnection(server_ip, api_key) {
     var connObj = {
