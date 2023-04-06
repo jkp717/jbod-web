@@ -123,6 +123,9 @@ class NewSetupView(BaseView):
 
 
 class SysConfigView(JBODBaseView):
+    can_create = False
+    can_delete = False
+    can_edit = True
     column_exclude_list = JBODBaseView.column_exclude_list + ['encrypt']
     column_editable_list = ['value', 'encrypt']
 
