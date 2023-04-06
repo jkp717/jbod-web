@@ -123,7 +123,8 @@ def query_disk_temperatures() -> None:
     with scheduler.app.app_context():
         disks = db.session.query(Disk).all()
         if not disks:
-            raise Exception("query_disk_temperatures scheduled job skipped. No disks to query.")
+            _logger.warning("query_disk_temperatures scheduled job skipped. No disks to query.")
+            return
         resp = utils.truenas_api_request(
             'POST',
             '/api/v2.0/disk/temperatures',
@@ -131,6 +132,7 @@ def query_disk_temperatures() -> None:
             data={"names": [disk.name for disk in disks], "powermode": "NEVER"}
         )
         if resp.status_code == 200:
+            _logger.debug(f"query_disk_temperatures received a valid response from host; {resp}")
             for _name, temp in resp.json().items():
                 db.session.add(
                     DiskTemp(**{'disk_serial': d.serial for d in disks if d.name == _name}, temp=temp)
@@ -205,9 +207,10 @@ def poll_setpoints() -> None:
                 _logger.warning(f"poll_setpoints: No active pwm fans found for {jbod.name or jbod.id} chassis;")
                 continue
             try:
-                temp_agg = max([int(d.last_temp_reading) for d in disks if str(d.last_temp_reading).isnumeric()])
+                temp_agg = max([int(d.temperature) for d in disks if str(d.temperature).isnumeric()])
             except ValueError:
-                _logger.warning("poll_setpoints: No last_temp_reading available for chassis %s, %s", jbod.name, jbod.id)
+                _logger.warning(f"poll_setpoints: No temperature available for chassis {jbod.name or jbod.id}; "
+                                f"temperature: {[d.temperature for d in disks]}")
                 continue
             # get all setpoint models for each fan
             for fan in fans:
@@ -303,6 +306,9 @@ def database_cleanup():
     with scheduler.app.app_context():
         db.session.excute(
             text("""DELETE FROM disk_temp WHERE create_date < now() - INTERVAL 2 DAY;""")
+        )
+        db.session.excute(
+            text("""DELETE FROM fan_log WHERE create_date < now() - INTERVAL 2 DAY;""")
         )
         db.session.commit()
 
