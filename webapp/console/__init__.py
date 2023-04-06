@@ -94,6 +94,7 @@ class JBODRxData:
         self._data = None
         self.cc_mapper = {
             str(JBODControlCharacter.ACK.value).encode(self.ENCODING): False,
+            str(JBODControlCharacter.NAK.value).encode(self.ENCODING): False,
             str(JBODControlCharacter.XON.value).encode(self.ENCODING): False,
             str(JBODControlCharacter.XOFF.value).encode(self.ENCODING): False,
             str(JBODControlCharacter.DC2.value).encode(self.ENCODING): False,
@@ -104,6 +105,10 @@ class JBODRxData:
     @property
     def ack(self):
         return self.cc_mapper.get(str(JBODControlCharacter.ACK.value).encode(self.ENCODING))
+
+    @property
+    def nak(self):
+        return self.cc_mapper.get(str(JBODControlCharacter.NAK.value).encode(self.ENCODING))
 
     @property
     def xon(self):
@@ -145,8 +150,8 @@ class JBODRxData:
                 break
 
     def __repr__(self):
-        return f"JBODRxData(ack={self.ack},xon={self.xon},xoff={self.xoff},dc2={self.dc2},dc4={self.dc4}," \
-               f"data={self.data},raw_data={self.raw_data})"
+        return f"JBODRxData(ack={self.ack},nak={self.nak},xon={self.xon},xoff={self.xoff},dc2={self.dc2}," \
+               f"dc4={self.dc4},data={self.data},raw_data={self.raw_data})"
 
 
 class JBODConsole:
@@ -221,19 +226,12 @@ class JBODConsole:
                 if data:
                     self._data_received.extend(data)
                     if self.TERMINATOR in self._data_received:
-                        # sets NEW_RX_DATA flag
-                        self.rx_buffer = bytes(self._data_received)
-                        # reset bytearray
+                        rx = JBODRxData(bytes(self._data_received))
                         self._data_received = bytearray()
-                        retries = 0
-                        # give time to process rx data (0.5 sec max)
-                        while retries < 5 and self.NEW_RX_DATA:
-                            time.sleep(0.1)
-                            retries += 1
-                        # passing to callback if data has not been processed
-                        if self._callback and self.NEW_RX_DATA:
-                            # will clear NEW_RX_DATA flag
-                            self._callback(self, JBODRxData(bytes(self.rx_buffer)), **self._callback_kwargs)
+                        if rx.ack or rx.nak:
+                            self.rx_buffer = rx
+                        elif self._callback:
+                            self._callback(self, rx, **self._callback_kwargs)
                 time.sleep(0.01)
         except serial.SerialException as err:
             self.alive = False
@@ -279,7 +277,7 @@ class JBODConsole:
         b.extend(self.TERMINATOR)  # add terminator to end of bytearray
         with self._lock:
             self.serial.write(bytes(b))  # convert bytearray to bytes
-            resp = JBODRxData(self.receive_now())
+            resp = self.receive_now()
         if not resp.ack:
             raise JBODConsoleAckException(
                 command_req=fmt_command,
@@ -294,7 +292,7 @@ class JBODConsole:
         self.tx_buffer = None
 
     @property
-    def rx_buffer(self) -> Optional[bytes]:
+    def rx_buffer(self) -> Optional[JBODRxData]:
         """
         Getter clears buffer and sets flag on read.
         @return: buffer
@@ -305,14 +303,10 @@ class JBODConsole:
         return None
 
     @rx_buffer.setter
-    def rx_buffer(self, data: Optional[bytearray]):
+    def rx_buffer(self, data: Optional[JBODRxData]):
         # set to flag to false if None
         if not data:
             self.NEW_RX_DATA = False
-        # check if data is already sitting in buffer
-        elif self.NEW_RX_DATA:
-            # combine both into one bytearray
-            self._rx_buffer += data
         else:
             self.NEW_RX_DATA = True
         self._rx_buffer = data
@@ -321,6 +315,8 @@ class JBODConsole:
         """Blocking wait for receive"""
         retries = 0
         # wait for new data (0.5 sec max)
+        if self.NEW_RX_DATA:
+            return self.rx_buffer
         while retries < 100 and not self.NEW_RX_DATA:
             time.sleep(0.01)
             retries += 1
