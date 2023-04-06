@@ -321,7 +321,7 @@ class JBODConsole:
         """Blocking wait for receive"""
         retries = 0
         # wait for new data (0.5 sec max)
-        while retries < 50 and not self.NEW_RX_DATA:
+        while retries < 100 and not self.NEW_RX_DATA:
             time.sleep(0.01)
             retries += 1
         if self.NEW_RX_DATA:
