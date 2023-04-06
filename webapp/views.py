@@ -244,10 +244,13 @@ class FanView(JBODBaseView):
         if request.method == 'POST':
             content = request.get_json(force=True)
             for sp in content:
-                existing_model = db.session.query(FanSetpoint).where(FanSetpoint.temp == sp['temp']).first()
-                if sp['pwm'] != existing_model.pwm:
-                    existing_model.pwm = sp['pwm']
-            db.session.commit()
+                try:
+                    existing_model = db.session.query(FanSetpoint).where(FanSetpoint.temp == sp['temp']).first()
+                    if sp['pwm'] != existing_model.pwm:
+                        existing_model.pwm = sp['pwm']
+                    db.session.commit()
+                except IntegrityError:
+                    db.session.rollback()
             return jsonify({"result": "success"}), 200
         fid = request.args.get('fan_id')
         if not fid:
