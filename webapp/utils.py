@@ -79,6 +79,21 @@ def svg_html_converter(path: str) -> str:
         return ""
 
 
+def pwm_change_formatter(view, context, model, name):  # noqa
+    return f"PWM changed from {model.old_pwm} to {model.new_pwm}"
+
+
+def fan_log_formatter(view, context, model, name):
+    cnt = len(model.logs)
+    filter_txt = 'flt1_fan_fan_id_equals'
+    if cnt > 0:
+        return Markup(
+            f"""<a class="list-model-link" href='{url_for("fan/log.index_view")}?{filter_txt}={model.id}'>
+                View Logs ({cnt} total)
+            </a>"""
+        )
+
+
 def disk_size_formatter(view, context, model, name):  # noqa
     size_bytes = getattr(model, name)
     if size_bytes == 0:
