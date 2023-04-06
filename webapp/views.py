@@ -152,20 +152,23 @@ class SysConfigView(JBODBaseView):
 
 
 class FanView(JBODBaseView):
-    can_create = False
+    can_create = True
     can_delete = False
     list_template = 'list.html'
     edit_template = 'fan/edit.html'
-    column_exclude_list = JBODBaseView.column_exclude_list + [
-        'calibration_job_uuid', 'calibration_status', 'min_rpm', 'max_rpm'
-    ]
+    column_list = ['controller', 'port_num', 'description', 'pwm', 'rpm', 'four_pin', 'active', 'logs']
     column_editable_list = ['description', 'pwm']
     form_excluded_columns = JBODBaseView.form_excluded_columns + [
         'setpoints', 'rpm', 'active', 'four_pin', 'port_num', 'controller', 'min_rpm', 'max_rpm',
-        'calibration_job_uuid', 'calibration_status', 'pwm'
+        'calibration_job_uuid', 'calibration_status', 'pwm', 'logs'
     ]
     form_rules = [rules.Header('Fan Setpoints')]
     column_filters = ['controller.id', 'controller.chassis', 'controller.chassis.id', 'rpm', 'active']
+    column_details_list = [
+        'pwm', 'rpm', 'active', 'four_pin', 'port_num', 'controller', 'controller.chassis', 'min_rpm', 'max_rpm',
+        'calibration_job_uuid', 'calibration_status', 'logs'
+    ]
+    column_formatters = {'logs': utils.fan_log_formatter}
     column_extra_row_actions = [utils.FanCalibrationRowAction()]
 
     def on_model_change(self, form, model, is_created):
@@ -315,6 +318,19 @@ class SetpointView(JBODBaseView):
                 db.session.commit()
 
 
+class FanLogView(JBODBaseView):
+    can_create = False
+    can_edit = False
+    can_delete = True
+    can_export = True
+    can_view_details = False
+    column_filters = ['fan.id', 'last_update']
+    column_sortable_list = ['last_update']
+    column_list = ['last_update', 'old_pwm']
+    column_labels = {'last_update': 'Date', 'old_pwm': 'Change Desc.'}
+    column_formatters = {'old_pwm': utils.pwm_change_formatter}
+
+
 class DiskView(JBODBaseView):
     can_view_details = True
     can_create = False
@@ -341,7 +357,15 @@ class DiskView(JBODBaseView):
     def refresh(self):
         try:
             query_disk_properties()
+            # activate supporting jobs
+            jobs = [
+                activate_sys_job('database_cleanup'),
+                activate_sys_job('query_disk_temperatures'),
+                activate_sys_job('query_disk_properties')
+            ]
             flash('Disk properties successfully refreshed.', 'info')
+            if jobs:
+                flash('Scheduled jobs where activated.', 'info')
         except MissingSchema:
             flash('Disk properties failed to refresh! '
                   'Missing url schema; add http:// or https:// to TrueNAS url.', 'error')
