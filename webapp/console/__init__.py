@@ -168,6 +168,7 @@ class JBODConsole:
         self._callback = callback
         self._data_received = bytearray()
         self._lock = threading.Lock()
+        self._rx_event = threading.Event()
         self._callback_kwargs = kwargs
 
     def _start_reader(self):
@@ -223,15 +224,18 @@ class JBODConsole:
                     if self.TERMINATOR in self._data_received:
                         # sets NEW_RX_DATA flag
                         self.rx_buffer = bytes(self._data_received)
+                        self._rx_event.set()
                         # reset bytearray
                         self._data_received = bytearray()
-                        retries = 0
+                        # retries = 0
                         # give time to process rx data (0.5 sec max)
-                        while retries < 50 and self.NEW_RX_DATA:
-                            time.sleep(0.01)
-                            retries += 1
+                        # while retries < 50 and self.NEW_RX_DATA:
+                        #     time.sleep(0.01)
+                        #     retries += 1
                         # passing to callback if data has not been processed
-                        if self._callback and self.NEW_RX_DATA:
+                        if self._rx_event.is_set():
+                            time.sleep(0.1)
+                        if self._callback and self._rx_event.is_set():
                             # will clear NEW_RX_DATA flag
                             self._callback(self, JBODRxData(bytes(self.rx_buffer)), **self._callback_kwargs)
                 time.sleep(0.01)
@@ -279,7 +283,7 @@ class JBODConsole:
         b.extend(self.TERMINATOR)  # add terminator to end of bytearray
         with self._lock:
             self.serial.write(bytes(b))  # convert bytearray to bytes
-            resp = JBODRxData(self.receive_now())
+        resp = JBODRxData(self.receive_now())
         if not resp.ack:
             raise JBODConsoleAckException(
                 command_req=fmt_command,
@@ -300,34 +304,39 @@ class JBODConsole:
         @return: buffer
         """
         if self._rx_buffer:
-            self.NEW_RX_DATA = False
+            self._rx_event.clear()
             return self._rx_buffer
         return None
 
     @rx_buffer.setter
     def rx_buffer(self, data: Optional[bytearray]):
-        # set to flag to false if None
+        # # set to flag to false if None
+        # if not data:
+        #     self.NEW_RX_DATA = False
+        # # check if data is already sitting in buffer
+        # elif self.NEW_RX_DATA:
+        #     # combine both into one bytearray
+        #     self._rx_buffer += data
+        # else:
+        #     self.NEW_RX_DATA = True
+        # self._rx_buffer = data
         if not data:
-            self.NEW_RX_DATA = False
-        # check if data is already sitting in buffer
-        elif self.NEW_RX_DATA:
-            # combine both into one bytearray
-            self._rx_buffer += data
-        else:
-            self.NEW_RX_DATA = True
+            self._rx_event.clear()
         self._rx_buffer = data
 
     def receive_now(self):
         """Blocking wait for receive"""
-        retries = 0
-        # wait for new data (0.5 sec max)
-        while retries < 50 and not self.NEW_RX_DATA:
-            time.sleep(0.01)
-            retries += 1
-        if self.NEW_RX_DATA:
-            return self.rx_buffer
-        else:
-            raise JBODConsoleTimeoutException("JBODConsole receive_now timed out.")
+        # retries = 0
+        # # wait for new data (0.5 sec max)
+        # while retries < 50 and not self.NEW_RX_DATA:
+        #     time.sleep(0.01)
+        #     retries += 1
+        # if self.NEW_RX_DATA:
+        #     return self.rx_buffer
+        # else:
+        #     raise JBODConsoleTimeoutException("JBODConsole receive_now timed out.")
+        self._rx_event.wait()
+        return self.rx_buffer
 
     @property
     def tx_buffer(self):
