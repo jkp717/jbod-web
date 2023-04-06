@@ -5,7 +5,7 @@ $(function () {
     } else {
         $('#connStatusPopover').removeClass('navbar-icon-alert');
     }
-}
+})
 
 
 function setupConnection(server_ip, api_key) {
