@@ -1,6 +1,6 @@
 {% import 'admin/lib.html' as lib with context %}
 
-<div id="setpointDeleteModal" class="modal" tabindex="-1" role="dialog">
+<div id="setpointCopyModal" class="modal" tabindex="-1" role="dialog">
   <div class="modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
@@ -12,14 +12,14 @@
       <div class="modal-body">
         {% block modal_body %}
         <div class="input-group mb-3">
-          <select class="custom-select" id="setpointDeleteSelect">
+          <select class="custom-select" id="setpointCopySelect">
             <option selected>Choose...</option>
-            {% for sp in setpoints %}
-            <option value="{{ sp.id }}">{{ sp.temp }} &deg;</option>
+            {% for fan in fans %}
+            <option value="{{ fan.id }}">{{ fan }}</option>
             {% endfor %}
           </select>
         </div>
-        <button class="btn btn-primary" onclick="deleteSetpoint( '{{ get_url('setpoints.delete_one') }}' );">{{ _gettext('Delete') }}</button>
+        <button class="btn btn-primary" onclick="copySetpoint( '{{ get_url('setpoints.copy_existing') }}');">{{ _gettext('Copy') }}</button>
         {% endblock %}
       </div>
     </div>

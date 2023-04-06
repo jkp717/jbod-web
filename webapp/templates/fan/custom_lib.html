@@ -5,10 +5,13 @@
       <canvas id="canvas" width="1000" height="300"></canvas>
     </div>
     <div class="container-fluid">
-     <a onclick="buildModalFromURL('new-setpoint-container', '{{ get_url('setpoints.create_view', fan_id=request.args.get('id')) }}', newSetpointHandler);" href="JavaScript:void(0);">{{ _gettext('Add Setpoint') }}</a>
+     <a onclick="buildModalFromURL('newSetpointContainer', '{{ get_url('setpoints.create_view', fan_id=request.args.get('id')) }}', newSetpointHandler);" href="JavaScript:void(0);">{{ _gettext('Add Setpoint') }}</a>
     </div>
     <div class="container-fluid">
-     <a onclick="buildModalFromURL('del-setpoint-container', '{{ get_url('setpoints.delete_one', fan_id=request.args.get('id')) }}');" href="JavaScript:void(0);">{{ _gettext('Delete Setpoint') }}</a>
+     <a onclick="buildModalFromURL('delSetpointContainer', '{{ get_url('setpoints.delete_one', fan_id=request.args.get('id')) }}');" href="JavaScript:void(0);">{{ _gettext('Delete Setpoint') }}</a>
+    </div>
+    <div class="container-fluid">
+     <a onclick="buildModalFromURL('copySetpointContainer', '{{ get_url('setpoints.copy_existing', fan_id=request.args.get('id')) }}');" href="JavaScript:void(0);">{{ _gettext('Copy Existing Profile') }}</a>
     </div>
 {% endmacro %}
 

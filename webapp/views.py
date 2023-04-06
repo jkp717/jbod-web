@@ -10,6 +10,7 @@ from flask_admin.model.template import LinkRowAction
 from requests.exceptions import MissingSchema
 from serial.tools.list_ports import comports
 from wtforms.widgets import PasswordInput
+from sqlalchemy.exc import IntegrityError
 
 from webapp import utils
 from webapp.console import JBODConsoleException
@@ -298,6 +299,25 @@ class SetpointView(JBODBaseView):
             .order_by(FanSetpoint.temp) \
             .all()
         return self.render('fan/delete_setpoint.html', setpoints=setpoints)
+
+    @expose('/copy', methods=['GET', 'POST'])
+    def copy_existing(self):
+        if request.method == 'POST':
+            content = request.get_json(force=True)
+            setpoints = db.session.query(FanSetpoint)\
+                .where(FanSetpoint.fan_id == int(content['copy_id']))\
+                .all()
+            for sp in setpoints:
+                try:
+                    utils.clone_model(sp, fan_id=int(content['id']))
+                except IntegrityError:
+                    db.session.rollback()
+            return jsonify({'result': 'success'}), 200
+        fan_id = request.args.get('fan_id')
+        if not fan_id:
+            return 'fan_id required!', 400
+        fans = db.session.query(Fan).where(Fan.setpoints != None, Fan.id != int(fan_id)).all() # noqa
+        return self.render('fan/copy_setpoint.html', fans=fans)
 
     def on_model_change(self, form, model, is_created):
         if 'fan_id' in request.args.keys():

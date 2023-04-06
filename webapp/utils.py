@@ -172,6 +172,19 @@ def cascade_add_setpoints(fan_id: int):
     db.session.add(FanSetpoint(fan_id=fan_id, pwm=int(max_fan_pwm), temp=max_chassis_temp))
 
 
+def clone_model(model, **kwargs):
+    """Clone an arbitrary sqlalchemy model object without its primary key values."""
+    table = model.__table__
+    non_pk_columns = [k for k in table.columns.keys() if k not in table.primary_key.columns.keys()]
+    data = {c: getattr(model, c) for c in non_pk_columns}
+    data.update(kwargs)
+
+    clone = model.__class__(**data)
+    db.session.add(clone)
+    db.session.commit()
+    return clone
+
+
 def get_config_formatters() -> dict:
     CONFIG_FORMATTERS = dict(typefmt.BASE_FORMATTERS)
     CONFIG_FORMATTERS.update({

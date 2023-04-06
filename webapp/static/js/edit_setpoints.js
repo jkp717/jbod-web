@@ -77,15 +77,15 @@ function renderChart(responseData) {
 }
 
 function buildModalForm(event, url) {
-    if ($('#setpoint-modal').length) {
-        $('#setpoint-modal').modal('show');
+    if ($('#setpointModal').length) {
+        $('#setpointModal').modal('show');
         return;
     }
     var xhttp = new XMLHttpRequest();
     xhttp.onreadystatechange = function() {
         if (this.readyState == 4 && this.status == 200) {
-            document.getElementById("setpoint-modal-container").innerHTML= this.response;
-            $('#setpoint-modal').modal('show');
+            document.getElementById("setpointModalContainer").innerHTML= this.response;
+            $('#setpointModal').modal('show');
             newSetpointHandler();
         }
     }
@@ -94,7 +94,7 @@ function buildModalForm(event, url) {
 }
 
 function newSetpointHandler() {
-  const form = document.getElementById("setpoint-modal").querySelector("form.admin-form");
+  const form = document.getElementById("setpointModal").querySelector("form.admin-form");
   let newPWM;
 
   // Add 'submit' event handler
@@ -104,7 +104,7 @@ function newSetpointHandler() {
     const XHR = new XMLHttpRequest();
 
     XHR.addEventListener("load", (event) => {
-      $('#setpoint-modal').modal('hide');
+      $('#setpointModal').modal('hide');
       form.reset();
       loadSetpointData(updateChart);
     });
@@ -167,14 +167,31 @@ function buildModalFromURL(containerId, url, callback) {
 }
 
 function deleteSetpoint(url) {
-    var spId = document.getElementById('setpoint-delete-select').value;
+    var spId = document.getElementById('setpointDeleteSelect').value;
         var xhttp = new XMLHttpRequest();
     xhttp.onreadystatechange = function() {
         if (this.readyState == 4 && this.status == 200) {
-            $('#setpoint-delete-modal').modal('hide');
+            $('#setpointDeleteModal').modal('hide');
             loadSetpointData(updateChart);
         }
     }
     xhttp.open("POST", url, true);
     xhttp.send(JSON.stringify({'id': spId}));
+}
+
+function copySetpoint(url) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const fanId = urlParams.get('id');
+    const copyId = document.getElementById('setpointCopySelect').value;
+    const xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+            $('#setpointCopyModal').modal('hide');
+            loadSetpointData(updateChart);
+        } else {
+            console.log(this);
+        }
+    }
+    xhttp.open("POST", url, true);
+    xhttp.send(JSON.stringify({'id': fanId, 'copy_id': copyId}));
 }
