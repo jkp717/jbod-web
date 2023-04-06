@@ -1,7 +1,6 @@
 import time
 import logging
 import json
-import uuid
 from datetime import datetime, timedelta
 from typing import Optional, Union
 from flask import current_app
@@ -326,7 +325,7 @@ def _poll_controller_data() -> None:
             for c in ctrlr:
                 if not c.last_ds2:
                     pass
-                elif c.last_ds2 >= datetime.utcnow() - timedelta(seconds=job.seconds*2, minutes=job.minutes*2):
+                elif c.last_ds2 >= (datetime.utcnow() - timedelta(seconds=job.seconds*2, minutes=job.minutes*2)):
                     c.alive = True
                 else:
                     c.alive = False
@@ -426,23 +425,6 @@ def toggle_controller_led(controller_id: int, duration: int = 10) -> None:
         tty.command_write(JBODCommand.LED_OFF, controller_id, 2)
 
 
-def test_serial_job() -> None:
-    with current_app.app_context():
-        print("writing test started")
-        tty = get_console()
-        if not tty:
-            raise SerialException("Serial connection not established.")
-        resp = tty.command_write(JBODCommand.DEVICE_ID, 1)
-        print(resp)
-
-
-def test_fan_job(fan_id) -> None:
-    with scheduler.app.app_context():
-        from random import randint
-        time.sleep(randint(7, 10))
-        _logger.debug(f"test_fan_job ran! fan_id: {fan_id}")
-
-
 def _truenas_shutdown(tty: JBODConsole):
     with scheduler.app.app_context():
         _logger.info("Shutdown request received from controller. "
@@ -501,6 +483,7 @@ def console_callback(tty: JBODConsole, rx: JBODRxData):
                         fan.rpm = int(rpm)
                         _logger.debug("Stored fan[%s] rpm: %s", fan.id, fan.rpm)
                 ctrlr.last_ds2 = datetime.utcnow()
+                ctrlr.alive = True
                 db.session.commit()
             except Exception as err:  # noqa
                 _logger.error("Unable to parse controller data: %s", rx)

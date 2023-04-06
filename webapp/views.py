@@ -154,7 +154,7 @@ class FanView(JBODBaseView):
     list_template = 'list.html'
     edit_template = 'fan/edit.html'
     column_exclude_list = JBODBaseView.column_exclude_list + [
-        'calibration_job_uuid', 'calibration_status'
+        'calibration_job_uuid', 'calibration_status', 'min_rpm', 'max_rpm'
     ]
     column_editable_list = ['description', 'pwm']
     form_excluded_columns = JBODBaseView.form_excluded_columns + [
