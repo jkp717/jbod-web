@@ -30,8 +30,9 @@ def setup_flask_admin(app_instance, session):
         base_template='jbod_base.html'
     )
     admin.init_app(app_instance, index_view=vw.IndexView(name='Home', url='/'))
+    admin.add_view(vw.ChassisView(mdl.Chassis, session, name='Chassis', category='Chassis'))
+    admin.add_view(vw.PhySlotView(mdl.PhySlot, session, name='Disk Slots', category='Chassis'))
     admin.add_view(vw.DiskView(mdl.Disk, session))
-    admin.add_view(vw.ChassisView(mdl.Chassis, session))
     admin.add_view(vw.ControllerView(mdl.Controller, session))
     admin.add_view(vw.FanView(mdl.Fan, session, name='Fans', endpoint='fan', category='Fans'))
     admin.add_view(vw.FanLogView(mdl.FanLog, session, name='ChangeLog', endpoint='fan/log', category='Fans'))
@@ -40,7 +41,6 @@ def setup_flask_admin(app_instance, session):
     admin.add_view(vw.SetpointView(mdl.FanSetpoint, session, name='setpoints', endpoint='setpoints'))
     admin.add_view(vw.NewSetupView(name='Setup', endpoint='setup'))
     admin.add_view(vw.AlertView(mdl.Alert, session, endpoint='alerts'))
-
     return app_instance
 
 

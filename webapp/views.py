@@ -479,6 +479,17 @@ class ChassisView(JBODBaseView):
             db.session.commit()
 
 
+class PhySlotView(JBODBaseView):
+    can_view_details = True
+    can_edit = True
+    can_create = False
+    can_delete = False
+    column_list = ['phy_slot', 'chassis', 'disk', 'last_update']
+
+    def get_empty_list_message(self):
+        return Markup(f"<a href={self.get_url('chassis.index_view')}>Add a New Chassis</a>")
+
+
 class ControllerView(JBODBaseView):
     can_create = False
     # can_create = True
