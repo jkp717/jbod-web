@@ -153,7 +153,7 @@ class SysConfigView(JBODBaseView):
 
 
 class FanView(JBODBaseView):
-    can_create = True
+    can_create = False
     can_delete = False
     list_template = 'list.html'
     edit_template = 'fan/edit.html'
