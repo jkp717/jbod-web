@@ -1,3 +1,13 @@
+$(function () {
+    // check for any disconnected children and update badge icon flag
+    if ($('#connStatusPopover').find('.popover-content-attr.disconnected').length > 0) {
+        $('#connStatusPopover').addClass('navbar-icon-alert');
+    } else {
+        $('#connStatusPopover').removeClass('navbar-icon-alert');
+    }
+}
+
+
 function setupConnection(server_ip, api_key) {
     var connObj = {
         api_key: api_key,
@@ -83,10 +93,7 @@ function wsAuthenticate(ws, connectionObj, authSuccessCallback) {
   }));
   ws.onmessage = function (evt) {
     var authRecvObj = JSON.parse(evt.data);
-    console.log("authRecvObj: ");
-    console.log(authRecvObj);
     if (authRecvObj.result) {
-      console.log("Authentication successful!");
       return authSuccessCallback(ws);
     } else {
       console.log("Authentication failed!");
@@ -204,10 +211,6 @@ function updateStatusIcon(options) {
         $(iconDiv).addClass('disconnected');
         break;
     }
-    if (popoverDiv.find(".popover-content-attr").hasClass('disconnected')) {
-        popoverDiv.addClass("navbar-icon-alert");
-    }
-
     // check for any disconnected children and update badge icon flag
     if (popoverDiv.find('.popover-content-attr.disconnected').length > 0) {
         popoverDiv.addClass('navbar-icon-alert');
