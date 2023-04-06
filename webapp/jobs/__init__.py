@@ -207,9 +207,9 @@ def poll_setpoints() -> None:
                 _logger.warning(f"poll_setpoints: No active pwm fans found for {jbod.name or jbod.id} chassis;")
                 continue
             try:
-                temp_agg = max([int(d.temperature) for d in disks if str(d.temperature).isnumeric()])
+                temp_agg = max([int(d.temperature) for d in disks if int(d.temperature)])
             except ValueError:
-                _logger.warning(f"poll_setpoints: No temperature available for chassis {jbod.name or jbod.id}; "
+                _logger.warning(f"poll_setpoints: No numeric temperature values for chassis {jbod.name or jbod.id}; "
                                 f"temperature: {[d.temperature for d in disks]}")
                 continue
             # get all setpoint models for each fan
