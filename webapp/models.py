@@ -315,7 +315,9 @@ class Fan(db.Model):
         return self.create_date
 
     def __repr__(self):
-        return f"Fan ID: {self.id}"
+        if self.controller:
+            return f"Fan: {self.port_num} | Controller: {self.controller.name or self.controller_uuid}"
+        return f"FanID: {self.id}"
 
 
 class FanSetpoint(db.Model):
