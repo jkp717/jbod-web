@@ -74,7 +74,7 @@ def generate_key(salt, token) -> Fernet:
     return Fernet(key)
 
 
-def create_app(dev=False):
+def create_app(debug=False):
     # create and configure the app
     app = Flask(__name__)
     app.jinja_env.trim_blocks = True
@@ -86,7 +86,7 @@ def create_app(dev=False):
             f.write(f"SECRET_KEY={Fernet.generate_key().decode()}\n")
             f.write(f"SECRET_KEY_SALT={base64.b64encode(os.urandom(16)).decode()}\n")
 
-    if not dev:
+    if not debug:
         app.config.from_object('config.ProdConfig')
     else:
         app.config.from_object('config.DevConfig')
