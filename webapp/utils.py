@@ -166,7 +166,7 @@ def cascade_add_setpoints(fan_id: int):
     min_fan_pwm = int(get_config_value('min_fan_pwm'))
     max_fan_pwm = int(get_config_value('max_fan_pwm'))
     mid_fan_pwm = round((int(min_fan_pwm) + int(max_fan_pwm)) / 2)
-    mid_chassis_temp = round((min_chassis_temp + max_chassis_temp) / 2)
+    mid_chassis_temp = round((min_chassis_temp + max_chassis_temp) / 2, -1)
     db.session.add(FanSetpoint(fan_id=fan_id, pwm=int(min_fan_pwm), temp=min_chassis_temp))
     db.session.add(FanSetpoint(fan_id=fan_id, pwm=mid_fan_pwm, temp=mid_chassis_temp))
     db.session.add(FanSetpoint(fan_id=fan_id, pwm=int(max_fan_pwm), temp=max_chassis_temp))
