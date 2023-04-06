@@ -188,7 +188,7 @@ class FanView(JBODBaseView):
             else:
                 current_app.logger.error("Cannot adjust PWM; no controllers are currently connected!")
 
-    @expose('/edit', methods=['GET'])
+    @expose('/edit', methods=['GET', 'POST'])
     def edit_view(self):
         """Override of the builtin edit_view"""
         return_url = get_redirect_target() or self.get_url('.index_view')
@@ -282,8 +282,13 @@ class FanView(JBODBaseView):
             content = request.get_json(force=True)
             for sp in content:
                 try:
-                    existing_model = db.session.query(FanSetpoint).where(FanSetpoint.temp == sp['temp']).first()
-                    if sp['pwm'] != existing_model.pwm:
+                    existing_model = db.session.query(FanSetpoint)\
+                        .where(FanSetpoint.temp == sp['temp'], FanSetpoint.fan_id == sp['fan_id'])\
+                        .first()
+                    if not existing_model:
+                        spm = FanSetpoint(**sp)
+                        db.session.add(spm)
+                    elif sp['pwm'] != existing_model.pwm:
                         existing_model.pwm = sp['pwm']
                     db.session.commit()
                 except IntegrityError:
