@@ -232,7 +232,7 @@ class JBODConsole:
                             self.rx_buffer = rx
                         elif self._callback:
                             self._callback(self, rx, **self._callback_kwargs)
-                time.sleep(0.01)
+                time.sleep(0.1)
         except serial.SerialException as err:
             self.alive = False
             raise err
@@ -245,7 +245,7 @@ class JBODConsole:
                     with self._lock:
                         self.serial.write(self.tx_buffer)
                     self.tx_buffer = None  # clear buffer once transmitted
-                time.sleep(0.01)
+                time.sleep(0.1)
         except Exception as err:
             self.alive = False
             raise err
@@ -268,7 +268,7 @@ class JBODConsole:
 
     def command_write(self, command: Union[JBODCommand, JBODControlCharacter], *args) -> JBODRxData:
         """Blocking write command and return JBODRxData"""
-        self.flush_buffers()
+        # self.flush_buffers()
         if isinstance(command, JBODCommand):
             fmt_command = self._command_format(command, tuple(args) if args else None)
         else:
@@ -315,15 +315,12 @@ class JBODConsole:
         """Blocking wait for receive"""
         retries = 0
         # wait for new data (0.5 sec max)
-        if self.NEW_RX_DATA:
-            return self.rx_buffer
-        while retries < 100 and not self.NEW_RX_DATA:
+        while retries < 100:
             time.sleep(0.01)
+            if self.NEW_RX_DATA:
+                return self.rx_buffer
             retries += 1
-        if self.NEW_RX_DATA:
-            return self.rx_buffer
-        else:
-            raise JBODConsoleTimeoutException("JBODConsole receive_now timed out.")
+        raise JBODConsoleTimeoutException("JBODConsole receive_now timed out.")
 
     @property
     def tx_buffer(self):

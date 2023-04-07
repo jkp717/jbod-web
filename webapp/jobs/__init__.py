@@ -177,6 +177,14 @@ def query_host_state() -> str:
 
 
 def poll_setpoints() -> None:
+    # TODO: Figure out a better way of dealing with race conditions
+    with scheduler.app.app_context():
+        scheduler.pause_job('poll_controller_data')
+        _poll_setpoints()
+        scheduler.resume_job('poll_controller_data')
+
+
+def _poll_setpoints() -> None:
     """
     Polls disk temps and sets the corresponding fan PWM setpoint.
     Writes any changes to database.
@@ -234,7 +242,7 @@ def poll_setpoints() -> None:
                             new_pwm = setpoints[-1].pwm
                 # only send changes if value has changed
                 if new_pwm != fan.pwm and new_pwm is not None:
-                    new_pwm = tty.command_write(JBODCommand.PWM, jbod.controller.id, fan.id, new_pwm)
+                    new_pwm = tty.command_write(JBODCommand.PWM, jbod.controller.id, fan.port_num, new_pwm)
                     fan.pwm = int(new_pwm.data)
                     db.session.commit()
                     # write changes to db if request is successful
