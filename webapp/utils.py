@@ -83,7 +83,7 @@ def pwm_change_formatter(view, context, model, name):  # noqa
     return f"PWM changed from {model.old_pwm} to {model.new_pwm}"
 
 
-def fan_log_formatter(view, context, model, name):
+def fan_log_formatter(view, context, model, name):  # noqa
     cnt = len(model.logs)
     filter_txt = 'flt1_fan_fan_id_equals'
     if cnt > 0:
@@ -250,7 +250,7 @@ class AlertLogHandler(logging.Handler):
         self.log_msg = None
 
     def emit(self, record):
-        # Clear the log message so it can be put to db via sql (escape quotes)
+        # Clear the log message so that it can be put to db via sql (escape quotes)
         self.log_msg = record.msg.strip().replace('\'', '\'\'')
         # Make the SQL insert
         with self.app_context.app_context():

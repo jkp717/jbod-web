@@ -19,6 +19,7 @@ class Config:
     FLASK_ADMIN_FLUID_LAYOUT = True
     SQLALCHEMY_DATABASE_URI = f"sqlite:///{os.path.join(basedir, 'instance', 'jbod.db')}"
     SERIAL_DEBUG_FILE = os.path.join(basedir, 'instance', 'serial.log')
+    UPLOAD_DIR = os.path.join(basedir, 'instance', 'uploads')
     SCHEDULER_JOBS = []  # APScheduler Jobs
 
 

@@ -16,7 +16,7 @@ from webapp.config import config_defaults, scheduler_jobs
 
 
 # run the following to start server
-# sudo gunicorn -w 1 -b 0.0.0.0 'webapp:create_app()' --threads 10
+# sudo gunicorn -w 1 -b 0.0.0.0 'webapp:create_app(debug=True)' --threads 10
 
 
 def setup_flask_admin(app_instance, session):
@@ -105,6 +105,9 @@ def create_app(debug=False):
     db.init_app(app)
 
     with app.app_context():
+        # create an upload directory if it doesn't exist already
+        if not os.path.exists(app.config['UPLOAD_DIR']):
+            os.mkdir(app.config['UPLOAD_DIR'])
         # Create the database if it doesn't already exist
         if not os.path.exists(app.config['SQLALCHEMY_DATABASE_URI']):
             db.create_all()

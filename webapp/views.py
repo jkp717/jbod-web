@@ -5,7 +5,7 @@ from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 from flask import current_app, jsonify, request, redirect, flash, Markup
 from flask_admin import expose, BaseView
 from flask_admin.contrib.sqla import ModelView
-from flask_admin.form import rules, FormOpts
+from flask_admin.form import rules, FormOpts, FileUploadField
 from flask_admin.helpers import get_redirect_target
 from flask_admin.model.base import get_mdict_item_or_list
 from flask_admin.model.template import LinkRowAction
@@ -463,8 +463,15 @@ class ChassisView(JBODBaseView):
         'populated_slots': 'Slots In-Use',
         'psu_on': 'PSU'
     }
+    form_extra_fields = {
+        'upload_file': FileUploadField("Test")
+    }
+    column_descriptions = {
+        'upload_file': 'Upload a CSV with disk serial, slot id'
+    }
 
     def after_model_change(self, form, model, is_created):
+        print(form.__dict__)
         if is_created:
             for i in range(model.slot_cnt):
                 db.session.add(PhySlot(chassis_id=model.id, phy_slot=i + 1))
