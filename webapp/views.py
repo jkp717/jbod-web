@@ -44,7 +44,7 @@ class IndexView(BaseView):
             'truenas': truenas_connection_info() is not None,
             'controller': console_connection_check(),
             'chassis': utils.get_model_by_id(Chassis, 1) is not None,
-            'jobs': db.session.query(SysJob).where(SysJob.active == False).all() is None,  # noqa
+            'jobs': len(db.session.query(SysJob).where(SysJob.active == False).all()) == 0,  # noqa
         }
         jbods = db.session.query(Chassis).where(Chassis.controller_id is not None).all()  # noqa
         return self.render(
@@ -155,7 +155,7 @@ class SysConfigView(JBODBaseView):
 
 
 class FanView(JBODBaseView):
-    can_create = True
+    can_create = False
     can_delete = False
     can_edit = False  # handled by a custom row action
     list_template = 'list.html'
