@@ -60,6 +60,9 @@ def get_console() -> Union[JBODConsole, None]:
 
 
 def console_connection_check():
+    """
+    Used in jinja2 templates
+    """
     tty = get_console()
     if tty is not None:
         if not tty.serial.is_open:
@@ -146,6 +149,8 @@ def _query_zfs_properties() -> dict:
     """Ran inside query disk properties job"""
     resp = utils.truenas_api_request('GET', '/api/v2.0/pool')
     if resp.status_code == 200:
+        _logger.debug(f"_query_zfs_properties received a valid response from host; {resp}")
+        _logger.info(f"_query_zfs_properties: retrieving ZFS properties; {resp}")
         data = resp.json()
         disks = {}
         for pool in data:
@@ -166,6 +171,7 @@ def _query_zfs_properties() -> dict:
                 # disk name
                 disks[disk['disk']] = disk_props
         return disks
+    _logger.error(f"_query_zfs_properties received a invalid response from host; {resp}")
 
 
 def query_host_state() -> str:
@@ -177,11 +183,15 @@ def query_host_state() -> str:
 
 
 def poll_setpoints() -> None:
-    # TODO: Figure out a better way of dealing with race conditions
+    # TODO: Figure out a better way of dealing with serial race condition
     with scheduler.app.app_context():
         scheduler.pause_job('poll_controller_data')
-        _poll_setpoints()
-        scheduler.resume_job('poll_controller_data')
+        # give read thread loop time to clear buffer
+        time.sleep(0.2)
+        try:
+            _poll_setpoints()
+        finally:
+            scheduler.resume_job('poll_controller_data')
 
 
 def _poll_setpoints() -> None:
@@ -242,13 +252,13 @@ def _poll_setpoints() -> None:
                             new_pwm = setpoints[-1].pwm
                 # only send changes if value has changed
                 if new_pwm != fan.pwm and new_pwm is not None:
-                    new_pwm = tty.command_write(JBODCommand.PWM, jbod.controller.id, fan.port_num, new_pwm)
-                    fan.pwm = int(new_pwm.data)
+                    tty.command_write(JBODCommand.PWM, jbod.controller.id, fan.port_num, new_pwm)
+                    fan.pwm = new_pwm
                     db.session.commit()
                     # write changes to db if request is successful
                     _logger.info("Fan %s setpoint updated; New PWM: %s", fan.id, new_pwm)
                 else:
-                    _logger.debug("Fan %s setpoint is correct; no changes made", fan.fan_id)
+                    _logger.debug("Fan %s setpoint is correct; no changes made", fan.id)
 
 
 def ping_controllers(controller_id: Optional[int] = None) -> Union[list[dict], list[None]]:
