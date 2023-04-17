@@ -20,7 +20,6 @@ function setupConnection(server_ip, api_key) {
 };
 
 function serverStatusAPI(connectionObj) {
-    console.log("connecting to ws://" + connectionObj.ip + "/websocket");
     const hostWS = new WebSocket("ws://" + connectionObj.ip + "/websocket");
     hostWS.onopen = function() {
       // connect to server websocket
@@ -66,6 +65,8 @@ function serverStatusAPI(connectionObj) {
                         });
                     }
                 }
+                // send update request periodically to keep connection alive
+                wsConnectionStatePing(ws, 15000);
             };
             ws.onclose = function(evt) {
                 updateStatusIcon({
@@ -102,6 +103,21 @@ function wsAuthenticate(ws, connectionObj, authSuccessCallback) {
       return;
     }
   }
+}
+
+function wsConnectionStatePing(ws, pingInterval) {
+    ws.send(JSON.stringify({
+      "id": connectionObj.session,
+      "msg": "method",
+      "method": "system.state",
+    }));
+    ws.onmessage = function(evt) {
+        var updateRecv = JSON.parse(evt.data);
+        console.log("wsConnectionStatePing event data:");
+        console.log(evt.data);
+        // must be inside response callback function
+        setTimeout(function() { pollConsoleStatus(ws, pingInterval) }, pingInterval);
+    };
 }
 
 function openAlertSidebar() {
