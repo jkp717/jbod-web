@@ -25,7 +25,7 @@
 <span id="alertSidebar" class="navbar-sidebar{{ ' navbar-icon-alert' if alerts else '' }}">
     <a tabindex="0"  type="button" onclick="openAlertSidebar();">
         <i id="alertSidebarIcon" class="fa fa-bell"></i>
-        <span class="navbar-icon-badge"></span>
+        <span class="navbar-icon-badge">{{ alerts|length if alerts is not none else '' }}</span>
     </a>
     <div class="navbar-sidebar-content">
         <span class="close-sidebar" onclick="closeAlertSidebar();">&times;</span>
