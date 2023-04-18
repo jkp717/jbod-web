@@ -414,7 +414,7 @@ class FanLogView(JBODBaseView):
     column_exclude_list = ['modify_date']
     column_filters = ['fan', 'create_date']
     column_sortable_list = ['create_date', 'fan.id']
-    column_default_sort = ('create_date', False)
+    column_default_sort = ('create_date', True)
     column_list = ['create_date', 'fan', 'old_pwm']
     column_labels = {'create_date': 'Date', 'old_pwm': 'Change Desc.', 'fan': 'Fan'}
     column_formatters = {'old_pwm': utils.pwm_change_formatter}
