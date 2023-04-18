@@ -1,0 +1,37 @@
+{% extends 'list.html' %}
+
+{% block model_menu_bar_after_filters %}
+<li class="nav-item">
+    <span class="nav-link" onclick="$('#fileUploadModal').modal('show');">Upload CSV</span>
+</li>
+<!-- CSV File Upload Modal -->
+<div class="modal fade" id="fileUploadModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Disk Location CSV</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form action="{{ get_url('chassis.upload_file') }}" id="fileUploadForm" enctype="multipart/form-data" method="POST" role="form">
+          <div class="form-group">
+            <label for="file">CSV File</label>
+            <input id="file" class="form-control" type="file" name="file">
+            <small id="uploadFileHelp" class="form-text text-muted">CSV file including disk serial number & physical slot</small>
+          </div>
+<!--          <div class="form-group">
+            <label for="file_header">Contains a Header Row</label>
+            <input id="file_header" class="form-control" type="checkbox">
+          </div>-->
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            <button type="submit" class="btn btn-primary">Upload</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
