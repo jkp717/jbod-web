@@ -6,9 +6,7 @@ from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 from flask import current_app, jsonify, request, redirect, flash, Markup
 from flask_admin import expose, BaseView
 from flask_admin.contrib.sqla import ModelView
-from flask_admin.form import rules, FormOpts
-from flask_admin.helpers import get_redirect_target
-from flask_admin.model.base import get_mdict_item_or_list
+from flask_admin.form import rules
 from flask_admin.model.template import LinkRowAction
 from requests.exceptions import MissingSchema
 from serial.tools.list_ports import comports
