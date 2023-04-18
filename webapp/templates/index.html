@@ -9,7 +9,7 @@
         <b>{{ "" if setup_complete else "Setup Required!" }}</b> Click links below to complete. <i class="support-text">Settings can be updated at any time in the Settings tab.</i>
       </p>
       <div class="list-group">
-        <a href="#" class="list-group-item list-group-item-action" data-toggle="modal" data-target="#host-setup-modal">
+        <a href="#" class="list-group-item list-group-item-action" data-toggle="modal" data-target="#hostSetupModal">
           {% if setup_required.truenas %}
           <span class="fa fa-solid fa-check-circle" style="padding-right: 20px;"></span>
           {% else %}
@@ -17,7 +17,7 @@
           {% endif %}
           Setup TrueNAS API connection
         </a>
-        <a href="#" class="list-group-item list-group-item-action" data-toggle="modal" data-target="#controller-setup-modal">
+        <a href="#" class="list-group-item list-group-item-action" data-toggle="modal" data-target="#controllerSetupModal">
           {% if setup_required.controller %}
           <span class="fa fa-solid fa-check-circle" style="padding-right: 20px;"></span>
           {% else %}

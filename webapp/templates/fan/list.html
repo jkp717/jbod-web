@@ -1,0 +1,10 @@
+{% extends 'list.html' %}
+
+{% block tail %}
+{{ super() }}
+<script>
+$(function() {
+ $('a[title="Edit Record"]').hide();
+});
+</script>
+{% endblock %}
