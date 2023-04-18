@@ -20,6 +20,7 @@ class Config:
     SQLALCHEMY_DATABASE_URI = f"sqlite:///{os.path.join(basedir, 'instance', 'jbod.db')}"
     SERIAL_DEBUG_FILE = os.path.join(basedir, 'instance', 'serial.log')
     UPLOAD_DIR = os.path.join(basedir, 'instance', 'uploads')
+    MAX_CONTENT_LENGTH = 2 * 1000 * 1000  # 2 megabytes
     SCHEDULER_JOBS = []  # APScheduler Jobs
 
 
