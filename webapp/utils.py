@@ -1,6 +1,7 @@
 import logging
 import math
 import os
+import csv
 from datetime import datetime
 from enum import IntEnum
 from typing import Optional, Iterable, Union
@@ -11,8 +12,9 @@ from flask import Markup, current_app, Flask
 from flask_admin.helpers import url_for
 from flask_admin.model import typefmt
 from flask_admin.model.template import TemplateLinkRowAction
+from sqlalchemy.exc import IntegrityError
 
-from webapp.models import db, FanSetpoint, SysConfig, Disk, Alert
+from webapp.models import db, FanSetpoint, SysConfig, Disk, Alert, Chassis, PhySlot
 
 
 class StatusFlag(IntEnum):
@@ -163,6 +165,60 @@ class ControllerLEDRowAction(TemplateLinkRowAction):
 
 def get_model_by_id(model, id: Union[str, int], column_name: Optional[str] = 'id'):
     return db.session.query(model).where(getattr(model, column_name) == id).first()
+
+
+def csv_upload_processor(path: str, disk_serials: list, chassis_ids: list) -> dict:
+    """
+    CSV Disk (Physical Slot) Location Processor
+    @param path: String path to file
+    @param disk_serials: list of disk serial numbers
+    @param chassis_ids: list of chassis ids
+    @return: dict containing added_disks, missing_disks, duplicated_disks,
+    missing_chassis, skipped_slot
+    """
+    resp_dict = {
+        'added_disks': [],
+        'missing_disks': [],
+        'duplicated_disks': [],
+        'missing_chassis': [],
+        'skipped_slot': [],
+        'slot_in_use': []
+    }
+    _disks = []
+    with open(path, newline='') as csvfile:
+        csv_reader = csv.DictReader(csvfile, fieldnames=['chassis', 'disk', 'slot'])
+        for i, row in enumerate(csv_reader):
+            if (i == 0) or (row['disk'] == "" or row['chassis'] == "" or row['slot'] == ""):
+                continue
+            if row['disk'] not in disk_serials:
+                resp_dict['missing_disks'].append(row['disk'])
+                continue
+            if row['disk'] in _disks:
+                resp_dict['duplicated_disks'].append(row['disk'])
+                continue
+            else:
+                _disks.append(row['disk'])
+            disk = db.session.query(Disk).where(Disk.serial == row['disk']).first()
+            if int(row['chassis']) not in chassis_ids:
+                if row['chassis'] not in resp_dict['missing_chassis']:
+                    resp_dict['missing_chassis'].append(row['chassis'])
+                continue
+            chassis = db.session.query(Chassis).where(Chassis.id == row['chassis']).first()
+            if int(row['slot']) > chassis.slot_cnt:
+                resp_dict['skipped_slot'].append(row['slot'])
+                continue
+            physlot = db.session.query(PhySlot) \
+                .where(PhySlot.chassis_id == row['chassis'],
+                       PhySlot.phy_slot == row['slot']) \
+                .first()
+            disk.phy_slot_id = physlot.id
+            resp_dict['added_disks'].append(disk)
+            try:
+                db.session.commit()
+            except IntegrityError:
+                db.session.rollback()
+                resp_dict['slot_in_use'].append(f"{physlot} by {physlot.disk}")
+        return resp_dict
 
 
 def cascade_add_setpoints(fan_id: int):

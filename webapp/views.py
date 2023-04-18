@@ -20,7 +20,8 @@ from webapp.console import JBODConsoleException
 from webapp.jobs import scheduler, query_disk_properties, query_controller_properties, \
     truenas_connection_info, get_console, ping_controllers, console_connection_check, activate_sys_job
 from webapp.jobs.events import fan_calibration_job_listener
-from webapp.models import db, PhySlot, FanSetpoint, Fan, Controller, SysConfig, Chassis, SysJob, Alert
+from webapp.models import db, PhySlot, FanSetpoint, Fan, Controller, SysConfig, Chassis, \
+    SysJob, Alert, Disk
 
 
 class JBODBaseView(ModelView):
@@ -489,8 +490,13 @@ class ChassisView(JBODBaseView):
     @expose('/upload', methods=['POST'])
     def upload_file(self):
         if request.method == 'POST':
-            # check if the post request has the file part
-            print(request.__dict__)
+            try:
+                disk_serials = [d[0] for d in db.session.query(Disk.serial).all()]
+                chassis_ids = [c[0] for c in db.session.query(Chassis.id).all()]
+            except IndexError:
+                flash("No disks and/or Chassis available! "
+                      "Disks and at least one Chassis must be added first before using csv uploading.")
+                return redirect(self.get_url('.index_view'))
             if 'file' not in request.files:
                 flash('No file part')
                 return redirect(request.url)
@@ -499,7 +505,34 @@ class ChassisView(JBODBaseView):
                 flash('No selected file')
                 return redirect(request.url)
             if file and file.filename.rsplit('.', 1)[1].lower() == 'csv':
-                file.save(os.path.join(current_app.config['UPLOAD_FOLDER'], file.filename))
+                csv_path = os.path.join(current_app.config['UPLOAD_FOLDER'], file.filename)
+                file.save(csv_path)
+                try:
+                    result = utils.csv_upload_processor(csv_path, disk_serials, chassis_ids)
+                    flash_msg = "Finished processing CSV File. "
+                    msg_category = "info"
+                    if result['added_disks']:
+                        flash_msg += f"Disks updated: {len(result['added_disks'])}. "
+                        msg_category = "info"
+                    if result['duplicated_disks']:
+                        flash_msg += f"Duplicate disks skipped: {result['duplicated_disks']}. "
+                        msg_category = "warning"
+                    if result['missing_disks']:
+                        flash_msg += f"Disk serial numbers not found: {result['missing_disks']}. "
+                        msg_category = "warning"
+                    if result['missing_chassis']:
+                        flash_msg += f"Chassis IDs not found: {result['missing_chassis']}. "
+                        msg_category = "warning"
+                    if result['skipped_slot']:
+                        flash_msg += f"Slots outside chassis slot range: {result['skipped_slot']}. "
+                        msg_category = "warning"
+                    if result['slot_in_use']:
+                        flash_msg += f"Slot not empty and was skipped: {result['slot_in_use']}. "
+                        msg_category = "error"
+                    flash(flash_msg, category=msg_category)
+                finally:
+                    # always remove the uploaded file once complete
+                    os.remove(csv_path)
             return redirect(self.get_url('.index_view'))
 
     def after_model_change(self, form, model, is_created):
