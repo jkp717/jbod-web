@@ -271,13 +271,14 @@ function modalFormHandler(formElementId, formUrl) {
 
         // Define what happens on successful data submission
         modalXHR.addEventListener("load", (event) => {
-          var modalIdSelector = "#" + formElementId.replace('-form','-modal');
+          // replace Form in id name with Model, ie hostStatusForm to hostStatusModal
+          var modalIdSelector = "#" + formElementId.replace('Form','Modal');
           $(modalIdSelector).modal('hide');
           let resp = JSON.parse(modalXHR.responseText);
           if (resp['result'] == 'success') {
             document.querySelector('a[data-target="' + modalIdSelector + '"] > span').className = "fa fa-solid fa-check-circle";
             createAlertElements("success", resp["msg"]);
-            if (formElementId == "host-setup-form") {
+            if (formElementId == "hostSetupForm") {
               updateStatusIcon({
                 statusMsg: "READY",
                 popoverDiv: $('#connStatusPopover'),
@@ -293,7 +294,7 @@ function modalFormHandler(formElementId, formUrl) {
           } else {
             document.querySelector('a[data-target="' + modalIdSelector + '"] > span').className = "fa fa-solid fa-question-circle";
             createAlertElements("danger", resp["msg"]);
-            if (formElementId == "host-setup-form") {
+            if (formElementId == "hostSetupForm") {
               updateStatusIcon({
                 statusMsg: resp["result"].toUpperCase(),
                 popoverDiv: $('#connStatusPopover'),
