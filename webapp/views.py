@@ -562,7 +562,9 @@ class PhySlotView(JBODBaseView):
     can_edit = True
     can_create = False
     can_delete = False
+    can_export = True
     column_list = ['phy_slot', 'chassis', 'disk', 'last_update']
+    column_sortable_list = ['phy_slot', ('chassis', 'chassis.id')]
 
     def get_empty_list_message(self):
         return Markup(f"<a href={self.get_url('chassis.index_view')}>Add a New Chassis</a>")
