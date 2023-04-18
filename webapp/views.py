@@ -411,10 +411,12 @@ class FanLogView(JBODBaseView):
     can_delete = True
     can_export = True
     can_view_details = False
-    column_filters = ['fan', 'last_update']
-    column_sortable_list = ['last_update', 'fan.id']
-    column_list = ['last_update', 'fan', 'old_pwm']
-    column_labels = {'last_update': 'Date', 'old_pwm': 'Change Desc.', 'fan': 'Fan'}
+    column_exclude_list = ['modify_date']
+    column_filters = ['fan', 'create_date']
+    column_sortable_list = ['create_date', 'fan.id']
+    column_default_sort = ('create_date', False)
+    column_list = ['create_date', 'fan', 'old_pwm']
+    column_labels = {'create_date': 'Date', 'old_pwm': 'Change Desc.', 'fan': 'Fan'}
     column_formatters = {'old_pwm': utils.pwm_change_formatter}
 
 
