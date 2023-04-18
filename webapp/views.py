@@ -390,9 +390,9 @@ class FanLogView(JBODBaseView):
     can_export = True
     can_view_details = False
     column_filters = ['fan.id', 'last_update']
-    column_sortable_list = ['last_update']
-    column_list = ['last_update', 'old_pwm']
-    column_labels = {'last_update': 'Date', 'old_pwm': 'Change Desc.'}
+    column_sortable_list = ['last_update', 'fan.id']
+    column_list = ['last_update', 'fan', 'old_pwm']
+    column_labels = {'last_update': 'Date', 'old_pwm': 'Change Desc.', 'fan': 'Fan'}
     column_formatters = {'old_pwm': utils.pwm_change_formatter}
 
 
