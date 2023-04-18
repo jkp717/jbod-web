@@ -54,12 +54,18 @@
 .navbar-icon-badge {
     display: none;
     background-color: red;
-    width: 8px;
-    height: 8px;
+    min-width: 16px;
+    min-height: 15px;
+    padding: 2px;
     border-radius: 100%;
     position: absolute;
-    right: -3px;
-    top: -1px;
+    right: -7px;
+    top: -5px;
+    font-size: 8px;
+    font-weight: 900;
+    color: rgba(256,256,256,0.8);
+    text-align: center;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
 }
 
 .navbar-icon-alert > a > .navbar-icon-badge {
@@ -84,6 +90,38 @@
     position: relative;
     background-color: transparent;
 }
+
+.navbar-popover > a > i {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+    transition: box-shadow 0.3s cubic-bezier(.25,.8,.25,1);
+}
+
+.navbar-sidebar > a > i {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+    transition: box-shadow 0.3s cubic-bezier(.25,.8,.25,1);
+}
+
+.navbar-popover > a > i:hover {
+    box-shadow: 0 14px 28px rgba(0,0,0,0.50), 0 10px 10px rgba(0,0,0,0.60);
+}
+
+.navbar-sidebar > a > i:hover {
+    box-shadow: 0 14px 28px rgba(0,0,0,0.50), 0 10px 10px rgba(0,0,0,0.60);
+}
+
+.navbar-popover > a > i:active {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+.navbar-sidebar > a > i:active {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+.navbar-popover > a:hover { text-decoration: none; }
+.navbar-popover > a:link { text-decoration: none; }
+.navbar-popover > a:visited { text-decoration: none; }
+.navbar-popover > a:active { text-decoration: none; }
+
 
 .navbar-sidebar > a {
     padding: 0px;
@@ -111,6 +149,7 @@
 }
 
 span.nav-link {
+  color: #007bff;
   cursor: pointer;
 }
 
