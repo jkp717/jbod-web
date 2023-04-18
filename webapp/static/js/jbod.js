@@ -11,12 +11,13 @@ $(function () {
 });
 
 function setupConnection(server_ip, api_key) {
-    var connObj = {
+    const tnWebSocketConnObj = {
         api_key: api_key,
         ip: server_ip,
-        session: ''
+        session: '',
+        retries: 0,
     }
-    serverStatusAPI(connObj);
+    serverStatusAPI(tnWebSocketConnObj);
 };
 
 function serverStatusAPI(connectionObj) {
@@ -29,53 +30,7 @@ function serverStatusAPI(connectionObj) {
       var recvObj = JSON.parse(evt.data);
       if (recvObj.msg == "connected") {
         connectionObj.session = recvObj.session;
-        wsAuthenticate(hostWS, connectionObj, function(ws) {
-            // connection now established
-            ws.send(JSON.stringify({
-              "id": connectionObj.session,
-              "msg": "method",
-              "method": "system.state",
-            }));
-            // Get initial value and then subscribe to event stream
-            ws.onmessage = function(evt) {
-                var updateRecv = JSON.parse(evt.data);
-                console.log(evt.data);
-
-                // result is received on initial request
-                if (updateRecv.hasOwnProperty('result')) {
-                    updateStatusIcon({
-                        statusMsg: updateRecv.result,
-                        popoverDiv: $('#connStatusPopover'),
-                        iconDiv: document.getElementById("hostConnStatus")
-                    });
-                    // subscribe to event listener
-                    ws.send(JSON.stringify({
-                        "id": connectionObj.session,
-                        "name": "system",
-                        "msg": "sub"
-                    }));
-
-                // msg = 'ready' when first subscribed; new events msg = 'changed'
-                } else if (updateRecv.hasOwnProperty('msg')) {
-                    if (updateRecv.msg != 'ready' && updateRecv.hasOwnProperty('id')) {
-                        updateStatusIcon({
-                            statusMsg: updateRecv.id.toUpperCase(),
-                            popoverDiv: $('#connStatusPopover'),
-                            iconDiv: document.getElementById("hostConnStatus")
-                        });
-                    }
-                }
-                // send update request periodically to keep connection alive
-                wsConnectionStatePing(ws, 15000);
-            };
-            ws.onclose = function(evt) {
-                updateStatusIcon({
-                    statusMsg: "DEAD",
-                    popoverDiv: $('#connStatusPopover'),
-                    iconDiv: document.getElementById("hostConnStatus")
-                });
-            };
-        });
+        wsAuthenticate(hostWS, connectionObj, wsAuthenticateCallback);
       }
     };
     hostWS.onclose = function(evt) {
@@ -97,28 +52,73 @@ function wsAuthenticate(ws, connectionObj, authSuccessCallback) {
   ws.onmessage = function (evt) {
     var authRecvObj = JSON.parse(evt.data);
     if (authRecvObj.result) {
-      return authSuccessCallback(ws);
+      console.log("Calling authSuccessCallback");
+      authSuccessCallback(ws, connectionObj);
     } else {
       console.log("Authentication failed!");
-      return;
+      updateStatusIcon({
+        statusMsg: "DEAD",
+        popoverDiv: $('#connStatusPopover'),
+        iconDiv: document.getElementById("hostConnStatus")
+      });
     }
   }
 }
 
-function wsConnectionStatePing(ws, pingInterval) {
+function wsAuthenticateCallback(ws, connObj) {
+    // connection now established
     ws.send(JSON.stringify({
-      "id": connectionObj.session,
+      "id": connObj.session,
       "msg": "method",
       "method": "system.state",
     }));
+    // Get initial value and then subscribe to event stream
     ws.onmessage = function(evt) {
+        connObj.retries = 0;
         var updateRecv = JSON.parse(evt.data);
-        console.log("wsConnectionStatePing event data:");
+        console.log("wsAuthenticateCallback onmessage:");
         console.log(evt.data);
-        // must be inside response callback function
-        setTimeout(function() { pollConsoleStatus(ws, pingInterval) }, pingInterval);
+        // result is received on initial request
+        if (updateRecv.hasOwnProperty('result')) {
+            updateStatusIcon({
+                statusMsg: updateRecv.result,
+                popoverDiv: $('#connStatusPopover'),
+                iconDiv: document.getElementById("hostConnStatus")
+            });
+            // subscribe to event listener
+            ws.send(JSON.stringify({
+                "id": connObj.session,
+                "name": "system",
+                "msg": "sub"
+            }));
+        // msg = 'ready' when first subscribed; new events msg = 'changed'
+        } else if (updateRecv.hasOwnProperty('msg')) {
+            if (updateRecv.msg != 'ready' && updateRecv.hasOwnProperty('id')) {
+                updateStatusIcon({
+                    statusMsg: updateRecv.id.toUpperCase(),
+                    popoverDiv: $('#connStatusPopover'),
+                    iconDiv: document.getElementById("hostConnStatus")
+                });
+            }
+        }
     };
-}
+    ws.onclose = function(evt) {
+        // attempt to reconnect to close connection
+        // only retry to connect 3 times before setting connection to 'dead'
+        if (connObj.retries <= 3) {
+            // reconnect to websocket
+            connObj.retries++;
+            serverStatusAPI(connObj);
+        } else {
+            connObj.retries = 0;
+            updateStatusIcon({
+                statusMsg: "DEAD",
+                popoverDiv: $('#connStatusPopover'),
+                iconDiv: document.getElementById("hostConnStatus")
+            });
+        }
+    };
+};
 
 function openAlertSidebar() {
    $('.navbar-sidebar-content').addClass('show-sidebar');
