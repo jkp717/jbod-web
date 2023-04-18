@@ -40,6 +40,9 @@ class IndexView(BaseView):
 
     @expose('/')
     def index(self):
+        """
+        App index view
+        """
         setup_required = {
             'truenas': truenas_connection_info() is not None,
             'controller': console_connection_check(),
@@ -59,12 +62,16 @@ class IndexView(BaseView):
 class NewSetupView(BaseView):
     @expose('/')
     def index(self):
-        # placeholder to prevent Flask-Admin error
+        """
+        placeholder to prevent Flask-Admin error
+        """
         return 404
 
     @expose('/truenas', methods=['POST'])
     def truenas(self):
-        """Truenas initial setup"""
+        """
+        Truenas initial setup
+        """
         if request.method == 'POST':
             content = request.get_json(force=True)
             for k, v in content.items():
@@ -76,7 +83,9 @@ class NewSetupView(BaseView):
 
     @expose('/controller', methods=['GET', 'POST'])
     def controller(self):
-        """Controller(s) initial setup"""
+        """
+        New controller(s) initial setup
+        """
         if request.method == 'POST':
             content = request.get_json(force=True)
             for k, v in content.items():
@@ -190,7 +199,7 @@ class FanView(JBODBaseView):
 
     @expose('/edit', methods=['GET', 'POST'])
     def edit_view(self):
-        """Override of the builtin edit_view"""
+        """Override of the builtin fan edit_view"""
         return_url = get_redirect_target() or self.get_url('.index_view')
         id = get_mdict_item_or_list(request.args, 'id')
         if id is None:
@@ -223,6 +232,9 @@ class FanView(JBODBaseView):
 
     @expose('/calibrate/', methods=['GET'])
     def calibrate(self):
+        """
+        Starts a Fan calibration job
+        """
         fan_id = int(request.args.get('id'))
         if not fan_id:
             return jsonify({'result': 'error', 'message': 'fan id required'}), 400
@@ -246,6 +258,9 @@ class FanView(JBODBaseView):
 
     @expose('/calibrate/status', methods=['GET'])
     def calibrate_status(self):
+        """
+        Returns the status of a fan calibration job
+        """
         fan_id = int(request.args.get('id'))
         if not fan_id:
             return jsonify({
@@ -278,6 +293,10 @@ class FanView(JBODBaseView):
 
     @expose('/setpoints', methods=['POST', 'GET'])
     def data(self):
+        """
+        Fan Setpoints Route: Post/Get setpoints for a given fan
+        Returns a JSON of setpoints
+        """
         if request.method == 'POST':
             content = request.get_json(force=True)
             for sp in content:
@@ -317,6 +336,7 @@ class SetpointView(JBODBaseView):
 
     @expose('/data')
     def data(self):
+        # TODO: Does the same thing as fan/setpoints; can be deleted?
         fid = request.args.get('fan_id')
         if not fid:
             return "fan_id required", 400
@@ -389,7 +409,7 @@ class FanLogView(JBODBaseView):
     can_delete = True
     can_export = True
     can_view_details = False
-    column_filters = ['fan.id', 'last_update']
+    column_filters = ['fan', 'last_update']
     column_sortable_list = ['last_update', 'fan.id']
     column_list = ['last_update', 'fan', 'old_pwm']
     column_labels = {'last_update': 'Date', 'old_pwm': 'Change Desc.', 'fan': 'Fan'}
@@ -418,6 +438,9 @@ class DiskView(JBODBaseView):
 
     @expose('/refresh')
     def refresh(self):
+        """
+        Refresh disk properties
+        """
         try:
             query_disk_properties()
             # activate supporting jobs
@@ -441,6 +464,7 @@ class DiskView(JBODBaseView):
 
 
 class ChassisView(JBODBaseView):
+    # TODO: add option to upload csv of disk physical slot locations
     can_view_details = True
     list_template = 'list.html'
     form_excluded_columns = JBODBaseView.form_excluded_columns + [
@@ -463,7 +487,6 @@ class ChassisView(JBODBaseView):
     }
 
     def after_model_change(self, form, model, is_created):
-        print(form.__dict__)
         if is_created:
             for i in range(model.slot_cnt):
                 db.session.add(PhySlot(chassis_id=model.id, phy_slot=i + 1))
@@ -508,6 +531,9 @@ class ControllerView(JBODBaseView):
         return Markup(f"<a href={self.get_url('.broadcast')}>Search for connected Controllers</a>")
 
     def on_model_delete(self, model):
+        """
+        Cascade delete fan models
+        """
         if model.chassis:
             fans = db.session.query(Fan) \
                 .where(Fan.controller_id == model.id) \
