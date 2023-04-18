@@ -137,6 +137,8 @@ function deleteAlert(event, alertId, deleteAlertUrl) {
         $(event).parent().parent().remove();  // removal of actual li element
         if ($('#alertSidebar > .navbar-sidebar-content > ul').find("li").length > 0) {
             $('#alertSidebar').addClass("navbar-icon-alert");
+            // add alert counter to icon badge
+            $('#alertSidebar').find('.navbar-icon-badge').text($('#alertSidebar > .navbar-sidebar-content > ul').find("li").length);
         } else {
             $('#alertSidebar').removeClass("navbar-icon-alert");
         }
@@ -232,6 +234,8 @@ function updateStatusIcon(options) {
     // check for any disconnected children and update badge icon flag
     if (popoverDiv.find('.popover-content-attr.disconnected').length > 0) {
         popoverDiv.addClass('navbar-icon-alert');
+        // update the counter in the icon badge
+        popoverDiv.find('.navbar-icon-badge').text(popoverDiv.find('.popover-content-attr.disconnected').length);
     } else {
         popoverDiv.removeClass('navbar-icon-alert');
     }
