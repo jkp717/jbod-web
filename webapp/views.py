@@ -52,7 +52,7 @@ class IndexView(BaseView):
         jbods = db.session.query(Chassis).where(Chassis.controller_id is not None).all()  # noqa
         return self.render(
             'index.html',
-            setup_complete=not any(setup_required),
+            setup_complete=all(setup_required),
             setup_required=setup_required,
             jbods=jbods,
             disk_tooltip=['name', 'serial', 'temperature']
