@@ -110,6 +110,10 @@
   transition: width .2s ease-in-out;
 }
 
+span.nav-link {
+  cursor: pointer;
+}
+
 .navbar-sidebar-content > .close-sidebar {
   position: absolute;
   right: 10px;
