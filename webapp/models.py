@@ -354,12 +354,6 @@ class FanLog(db.Model):
     create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
 
-    @hybrid_property
-    def last_update(self):
-        if self.modify_date:
-            return self.modify_date
-        return self.create_date
-
     def __repr__(self):
         if self.fan:
             return f"{self.create_date}: PWM: {self.old_pwm} to {self.new_pwm}"
