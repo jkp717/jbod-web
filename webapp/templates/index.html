@@ -46,7 +46,7 @@
   </div>
 </div>
 <!-- TrueNAS API Modal -->
-<div class="modal fade" id="host-setup-modal" tabindex="-1" role="dialog" aria-labelledby="host-setup-modal" aria-hidden="true">
+<div class="modal fade" id="hostSetupModal" tabindex="-1" role="dialog">
   <div class="modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
@@ -56,7 +56,7 @@
         </button>
       </div>
       <div class="modal-body">
-        <form action="{{ get_url('setup.truenas') }}" id="host-setup-form" enctype="multipart/form-data" method="POST" role="form">
+        <form action="{{ get_url('setup.truenas') }}" id="hostSetupForm" enctype="multipart/form-data" method="POST" role="form">
           <div class="form-group">
             <label for="truenas_url">TrueNAS URL</label>
             <input class="form-control" id="truenas_url" placeholder="http://">
@@ -80,7 +80,7 @@
 {% block tail %}
 {{ super() }}
 <!-- JBOD Controller Modal -->
-<div class="modal fade" id="controller-setup-modal" tabindex="-1" role="dialog" aria-labelledby="controller-setup-modal" aria-hidden="true">
+<div class="modal fade" id="controllerSetupModal" tabindex="-1" role="dialog">
   <div class="modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
@@ -90,12 +90,12 @@
         </button>
       </div>
       <div class="modal-body">
-        <form action="" id="controller-setup-form" enctype="multipart/form-data" method="POST" role="form">
+        <form action="" id="controllerSetupForm" enctype="multipart/form-data" method="POST" role="form">
           <div class="form-group">
             <label for="console_port">Serial Port</label>
             <select class="form-control" id="console_port">
             </select>
-            <small id="console-port-help" class="form-text text-muted">Controller port address (ie /dev/ttyS0, etc)</small>
+            <small id="consolePortHelp" class="form-text text-muted">Controller port address (ie /dev/ttyS0, etc)</small>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
@@ -108,8 +108,8 @@
 </div>
 <script>
 $(function() {
-  modalFormHandler("host-setup-form", "{{ get_url('setup.truenas') }}");
-  modalFormHandler("controller-setup-form", "{{ get_url('setup.controller') }}");
+  modalFormHandler("hostSetupForm", "{{ get_url('setup.truenas') }}");
+  modalFormHandler("controllerSetupForm", "{{ get_url('setup.controller') }}");
   getConsolePortOptions("#console_port", "{{ get_url('setup.controller') }}");
 });
 </script>
