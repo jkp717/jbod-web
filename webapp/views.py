@@ -1,3 +1,4 @@
+import os
 import uuid
 
 import serial
@@ -464,9 +465,8 @@ class DiskView(JBODBaseView):
 
 
 class ChassisView(JBODBaseView):
-    # TODO: add option to upload csv of disk physical slot locations
     can_view_details = True
-    list_template = 'list.html'
+    list_template = 'chassis_list.html'
     form_excluded_columns = JBODBaseView.form_excluded_columns + [
         'fans', 'disks', 'phy_slots', 'psu_on'
     ]
@@ -485,6 +485,22 @@ class ChassisView(JBODBaseView):
         'populated_slots': 'Slots In-Use',
         'psu_on': 'PSU'
     }
+
+    @expose('/upload', methods=['POST'])
+    def upload_file(self):
+        if request.method == 'POST':
+            # check if the post request has the file part
+            print(request.__dict__)
+            if 'file' not in request.files:
+                flash('No file part')
+                return redirect(request.url)
+            file = request.files['file']
+            if file.filename == '':
+                flash('No selected file')
+                return redirect(request.url)
+            if file and file.filename.rsplit('.', 1)[1].lower() == 'csv':
+                file.save(os.path.join(current_app.config['UPLOAD_FOLDER'], file.filename))
+            return redirect(self.get_url('.index_view'))
 
     def after_model_change(self, form, model, is_created):
         if is_created:

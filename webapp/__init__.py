@@ -106,8 +106,8 @@ def create_app(debug=False):
 
     with app.app_context():
         # create an upload directory if it doesn't exist already
-        if not os.path.exists(app.config['UPLOAD_DIR']):
-            os.mkdir(app.config['UPLOAD_DIR'])
+        if not os.path.exists(app.config['UPLOAD_FOLDER']):
+            os.mkdir(app.config['UPLOAD_FOLDER'])
         # Create the database if it doesn't already exist
         if not os.path.exists(app.config['SQLALCHEMY_DATABASE_URI']):
             db.create_all()
