@@ -455,6 +455,9 @@ class ChassisView(JBODBaseView):
 
     @expose('/upload', methods=['POST'])
     def upload_file(self):
+        """
+        CSV file upload processor used for mapping disks to phy. slots
+        """
         if request.method == 'POST':
             try:
                 disk_serials = [d[0] for d in db.session.query(Disk.serial).all()]
@@ -536,7 +539,6 @@ class PhySlotView(JBODBaseView):
 
 class ControllerView(JBODBaseView):
     can_create = False
-    # can_create = True
     can_edit = False
     refresh_view = '.broadcast'
     list_template = 'refresh_list.html'
