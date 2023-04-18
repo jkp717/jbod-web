@@ -35,4 +35,4 @@ class ProdConfig(Config):
     DEBUG = False
     TESTING = False
     SERIAL_DEBUG = False
-    LOGGING_LEVEL = logging.INFO
+    LOGGING_LEVEL = logging.WARNING
