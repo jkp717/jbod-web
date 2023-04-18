@@ -5,7 +5,7 @@ from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 from flask import current_app, jsonify, request, redirect, flash, Markup
 from flask_admin import expose, BaseView
 from flask_admin.contrib.sqla import ModelView
-from flask_admin.form import rules, FormOpts, FileUploadField
+from flask_admin.form import rules, FormOpts
 from flask_admin.helpers import get_redirect_target
 from flask_admin.model.base import get_mdict_item_or_list
 from flask_admin.model.template import LinkRowAction
@@ -214,7 +214,7 @@ class FanView(JBODBaseView):
                     return redirect(self.get_save_return_url(model, is_created=False))
         if request.method == 'GET' or form.errors:
             self.on_form_prefill(form, id)
-        form_opts = FormOpts(widget_args=self.form_widget_args,form_rules=self._form_edit_rules)
+        form_opts = FormOpts(widget_args=self.form_widget_args, form_rules=self._form_edit_rules)
         if self.edit_modal and request.args.get('modal'):
             template = self.edit_modal_template
         else:
@@ -403,7 +403,6 @@ class DiskView(JBODBaseView):
     can_export = True
     refresh_view = '.refresh'
     list_template = 'refresh_list.html'
-    # column_editable_list = ['phy_slot']
     form_columns = ['phy_slot']
     column_editable_list = ['phy_slot']
     column_filters = ['serial', 'bus', 'type', 'size', 'phy_slot.chassis.name', 'zfs_pool']
@@ -412,7 +411,6 @@ class DiskView(JBODBaseView):
         'last_temp_reading', 'last_update'
     ]
     column_formatters = {'size': utils.disk_size_formatter}
-
     # form_excluded_columns = JBODBaseView.form_excluded_columns + ['disk_temps', ]
 
     def get_empty_list_message(self):
@@ -462,12 +460,6 @@ class ChassisView(JBODBaseView):
         'Chassis.populated_slots': 'Disks',
         'populated_slots': 'Slots In-Use',
         'psu_on': 'PSU'
-    }
-    form_extra_fields = {
-        'upload_file': FileUploadField("Test")
-    }
-    column_descriptions = {
-        'upload_file': 'Upload a CSV with disk serial, slot id'
     }
 
     def after_model_change(self, form, model, is_created):
