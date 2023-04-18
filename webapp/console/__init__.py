@@ -232,7 +232,7 @@ class JBODConsole:
                             self.rx_buffer = rx
                         elif self._callback:
                             self._callback(self, rx, **self._callback_kwargs)
-                time.sleep(0.1)
+                time.sleep(0.01)
         except serial.SerialException as err:
             self.alive = False
             raise err
