@@ -8,12 +8,12 @@ from apscheduler.job import Job
 from flask import current_app
 from flask_apscheduler import APScheduler
 from serial import SerialException, serial_for_url
-from sqlalchemy.sql import text
 
 from webapp import utils
 from webapp.console import JBODCommand, JBODConsole, JBODConsoleException, JBODRxData, ResetEvent
 from webapp.jobs import events as ev
-from webapp.models import db, SysConfig, Disk, DiskTemp, Chassis, Fan, FanSetpoint, Controller, PhySlot, SysJob
+from webapp.models import db, SysConfig, Disk, DiskTemp, Chassis, Fan, FanSetpoint, Controller, \
+    PhySlot, SysJob, FanLog
 
 scheduler = APScheduler()
 _logger = logging.getLogger("apscheduler_jobs")
@@ -322,12 +322,11 @@ def query_controller_properties(controller: Controller) -> Controller:
 
 def database_cleanup():
     with scheduler.app.app_context():
-        db.session.excute(
-            text("""DELETE FROM disk_temp WHERE create_date < now() - INTERVAL 2 DAY;""")
-        )
-        db.session.excute(
-            text("""DELETE FROM fan_log WHERE create_date < now() - INTERVAL 2 DAY;""")
-        )
+        filter_before = datetime.utcnow() - timedelta(days=2)
+        old_temps = db.session.query(DiskTemp).filter(DiskTemp.create_date <= filter_before).all()
+        old_logs = db.session.query(FanLog).filter(FanLog.create_date <= filter_before).all()
+        for row in old_temps.extend(old_logs):
+            db.session.delete(row)
         db.session.commit()
 
 
