@@ -226,13 +226,18 @@ class JBODConsole:
                 if data:
                     self._data_received.extend(data)
                     if self.TERMINATOR in self._data_received:
-                        rx = JBODRxData(bytes(self._data_received))
+                        if self._data_received.count(self.TERMINATOR) > 1:
+                            ops = list([o for o in self._data_received.split(self.TERMINATOR) if o != b''])
+                        else:
+                            ops = list(self._data_received)
                         self._data_received = bytearray()
-                        if rx.ack or rx.nak:
-                            self.rx_buffer = rx
-                        elif self._callback:
-                            self._callback(self, rx, **self._callback_kwargs)
-                time.sleep(0.01)
+                        for op in ops:
+                            rx = JBODRxData(bytes(op))
+                            if rx.ack or rx.nak:
+                                self.rx_buffer = rx
+                            elif self._callback:
+                                self._callback(self, rx, **self._callback_kwargs)
+                time.sleep(0.1)
         except serial.SerialException as err:
             self.alive = False
             raise err
