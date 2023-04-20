@@ -226,6 +226,8 @@ class JBODConsole:
                 if data:
                     self._data_received.extend(data)
                     if self.TERMINATOR in self._data_received:
+                        # Could have backlog of RX messages when reading;
+                        # process each separately
                         if self._data_received.count(self.TERMINATOR) > 1:
                             ops = list([o for o in self._data_received.split(self.TERMINATOR) if o != b''])
                         else:
