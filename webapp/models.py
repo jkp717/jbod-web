@@ -89,10 +89,11 @@ class Disk(db.Model):
     write_errors = db.Column(db.Integer, default=0)
     checksum_errors = db.Column(db.Integer, default=0)
     # End of columns retrieved from TrueNAS
+    temperature = db.Column(db.Integer)  # last temperature reading
     phy_slot_id = db.Column(db.Integer, db.ForeignKey("phy_slot.id"), unique=True)
     create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
-    disk_temps = db.relationship('DiskTemp', back_populates='disk')
+    disk_temps = db.relationship('DiskTemp', back_populates='disk', lazy="selectin")
     phy_slot = db.relationship('PhySlot', back_populates='disk', uselist=False)
 
     @hybrid_property
@@ -107,33 +108,26 @@ class Disk(db.Model):
             return max([temp.create_date for temp in self.disk_temps])
         return None
 
-    @last_temp_reading.expression
-    def last_temp_reading(cls):  # noqa
+    @last_temp_reading.inplace.expression
+    def _last_temp_reading(cls):  # noqa
         return (db.select(db.func.max(DiskTemp.create_date)).
                 where(DiskTemp.disk_serial == cls.serial).
                 label('last_temp_reading'))
-
-    @hybrid_property
-    def temperature(self):
-        if self.disk_temps:
-            curr = [t.temp for t in self.disk_temps if self.last_temp_reading == t.create_date]
-            try:
-                return Celsius(curr[0])
-            except IndexError:
-                pass
-        return Celsius(0)
-
-    @temperature.expression
-    def temperature(cls):  # noqa
-        return (db.select(DiskTemp.temp).
-                filter(DiskTemp.disk_serial == cls.serial, DiskTemp.create_date == cls.last_temp_reading).
-                label('temperature'))
 
     @hybrid_property
     def last_update(self):
         if self.modify_date:
             return self.modify_date
         return self.create_date
+
+
+update_disk_temp_trigger = db.DDL("""\
+CREATE TRIGGER update_disk_temp_tr UPDATE OF temp ON disk
+  BEGIN
+    INSERT INTO disk_temp (temp, disk_serial, create_date) 
+    VALUES (NEW.temp, NEW.disk_serial, DATETIME('now','localtime'));
+  END;""")
+db.event.listen(Disk.__table__, 'after_create', update_disk_temp_trigger)
 
 
 class DiskTemp(db.Model):

@@ -229,7 +229,7 @@ class JBODConsole:
                         # Could have backlog of RX messages when reading;
                         # process each separately
                         if self._data_received.count(self.TERMINATOR) > 1:
-                            ops = list([o for o in self._data_received.split(self.TERMINATOR) if o != b''])
+                            ops = [o + self.TERMINATOR for o in self._data_received.split(self.TERMINATOR) if o != b'\x00' and o != b'']
                         else:
                             ops = list(self._data_received)
                         self._data_received = bytearray()
@@ -322,6 +322,8 @@ class JBODConsole:
         """Blocking wait for receive"""
         retries = 0
         # wait for new data (0.5 sec max)
+        if self.NEW_RX_DATA:
+            return self.rx_buffer
         while retries < 10:
             time.sleep(0.1)
             if self.NEW_RX_DATA:
