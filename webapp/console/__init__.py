@@ -229,12 +229,13 @@ class JBODConsole:
                         # Could have backlog of RX messages when reading;
                         # process each separately
                         if self._data_received.count(self.TERMINATOR) > 1:
-                            ops = [o + self.TERMINATOR for o in self._data_received.split(self.TERMINATOR) if o != b'\x00' and o != b'']
+                            ops = filter(None, [o for o in self._data_received.strip(b'\x00').split(self.TERMINATOR)])
+                            ops = [bytes(d + self.TERMINATOR) for d in ops]
                         else:
-                            ops = list(self._data_received)
+                            ops = [bytes(self._data_received), ]
                         self._data_received = bytearray()
                         for op in ops:
-                            rx = JBODRxData(bytes(op))
+                            rx = JBODRxData(op)
                             if rx.ack or rx.nak:
                                 self.rx_buffer = rx
                             elif self._callback:
