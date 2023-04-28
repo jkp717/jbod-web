@@ -90,6 +90,7 @@ class Disk(db.Model):
     checksum_errors = db.Column(db.Integer, default=0)
     # End of columns retrieved from TrueNAS
     temperature = db.Column(db.Integer)  # last temperature reading
+    last_temp_reading = db.Column(db.DateTime)
     phy_slot_id = db.Column(db.Integer, db.ForeignKey("phy_slot.id"), unique=True)
     create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
@@ -101,18 +102,6 @@ class Disk(db.Model):
         if self.phy_slot:
             return self.phy_slot.chassis_id
         return None
-
-    @hybrid_property
-    def last_temp_reading(self):
-        if self.disk_temps:
-            return max([temp.create_date for temp in self.disk_temps])
-        return None
-
-    @last_temp_reading.inplace.expression
-    def _last_temp_reading(cls):  # noqa
-        return (db.select(db.func.max(DiskTemp.create_date)).
-                where(DiskTemp.disk_serial == cls.serial).
-                label('last_temp_reading'))
 
     @hybrid_property
     def last_update(self):

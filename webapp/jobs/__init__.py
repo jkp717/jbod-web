@@ -139,6 +139,7 @@ def query_disk_temperatures() -> None:
                 for disk in disks:
                     if disk.name == _name:
                         disk.temperature = temp
+                        disk.last_temp_reading = datetime.utcnow
                         break
             db.session.commit()
         else:
