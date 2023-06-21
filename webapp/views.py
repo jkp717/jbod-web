@@ -384,15 +384,15 @@ class FanLogView(JBODBaseView):
 class DiskView(JBODBaseView):
     can_view_details = True
     can_create = False
-    can_delete = False
+    can_delete = True
     can_export = True
     refresh_view = '.refresh'
     list_template = 'refresh_list.html'
     form_columns = ['phy_slot']
     column_editable_list = ['phy_slot']
-    column_filters = ['serial', 'bus', 'type', 'size', 'phy_slot.chassis.name', 'zfs_pool']
+    column_filters = ['serial', 'bus', 'type', 'size', 'phy_slot.chassis.name', 'zfs_pool', 'name']
     column_list = [
-        'serial', 'zfs_pool', 'model', 'size', 'type', 'bus', 'phy_slot', 'temperature',
+        'name', 'serial', 'zfs_pool', 'model', 'size', 'type', 'bus', 'phy_slot', 'temperature',
         'last_temp_reading', 'last_update'
     ]
     column_formatters = {'size': utils.disk_size_formatter}
@@ -421,9 +421,11 @@ class DiskView(JBODBaseView):
             flash('Disk properties failed to refresh! '
                   'Missing url schema; add http:// or https:// to TrueNAS url.', 'error')
         except Exception as err:
-            current_app.logger.error('DiskView.refresh: Failed to refresh disk properties.')
+            # current_app.logger.error('DiskView.refresh: Failed to refresh disk properties.')
+            current_app.logger.error(f'DiskView.refresh: {err}')
             flash('Failed to refresh disk properties.', 'error')
             if current_app.config['DEBUG']:
+                current_app.logger.error(f'DiskView.refresh: {err}')
                 raise err
         return redirect(self.get_url('.index_view'))
 
