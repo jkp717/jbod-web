@@ -19,7 +19,7 @@ from webapp.jobs import scheduler, query_disk_properties, query_controller_prope
     truenas_connection_info, get_console, ping_controllers, console_connection_check, activate_sys_job
 from webapp.jobs.events import fan_calibration_job_listener
 from webapp.models import db, PhySlot, FanSetpoint, Fan, Controller, SysConfig, Chassis, \
-    SysJob, Alert, Disk, DiskTemp
+    SysJob, Alert, Disk
 
 
 class JBODBaseView(ModelView):

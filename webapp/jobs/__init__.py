@@ -230,7 +230,7 @@ def _poll_setpoints() -> None:
                 _logger.warning(f"poll_setpoints: No active pwm fans found for {jbod.name or jbod.id} chassis;")
                 continue
             try:
-                temp_agg = max([int(d.temperature) for d in disks if int(d.temperature)])
+                temp_agg = max([int(d.temperature) for d in disks if d.temperature])
             except ValueError:
                 _logger.warning(f"poll_setpoints: No numeric temperature values for chassis {jbod.name or jbod.id}; "
                                 f"temperature: {[d.temperature for d in disks]}")
@@ -330,9 +330,11 @@ def database_cleanup():
         filter_before = datetime.utcnow() - timedelta(days=2)
         old_temps = db.session.query(DiskTemp).filter(DiskTemp.create_date <= filter_before).all()
         old_logs = db.session.query(FanLog).filter(FanLog.create_date <= filter_before).all()
-        for row in old_temps.extend(old_logs or []):
-            db.session.delete(row)
-        db.session.commit()
+        rows = old_temps.extend(old_logs or [])
+        if rows:
+            for r in rows:
+                db.session.delete(r)
+            db.session.commit()
 
 
 def poll_controller_data() -> None:
