@@ -8,6 +8,7 @@ from apscheduler.job import Job
 from flask import current_app
 from flask_apscheduler import APScheduler
 from serial import SerialException, serial_for_url
+from sqlalchemy.exc import IntegrityError
 
 from webapp import utils
 from webapp.console import JBODCommand, JBODConsole, JBODConsoleException, JBODRxData, ResetEvent
@@ -101,24 +102,27 @@ def query_disk_properties() -> None:
     with scheduler.app.app_context():
         resp = utils.truenas_api_request('GET', '/api/v2.0/disk')
         if resp:
-            zfs_props = _query_zfs_properties()
-            for disk in resp.json():
-                disk_zfs = zfs_props.get(disk.get('name'), {})
-                db.session.merge(
-                    Disk(
-                        name=disk.get('name', None),
-                        devname=disk.get('devname', None),
-                        model=disk.get('model', None),
-                        serial=disk.get('serial', None),
-                        subsystem=disk.get('subsystem', None),
-                        size=disk.get('size', None),
-                        rotationrate=disk.get('rotationrate', None),
-                        type=disk.get('type', None),
-                        bus=disk.get('bus', None),
-                        **disk_zfs
+            try:
+                zfs_props = _query_zfs_properties()
+                for disk in resp.json():
+                    disk_zfs = zfs_props.get(disk.get('name'), {})
+                    db.session.merge(
+                        Disk(
+                            name=disk.get('name', None),
+                            devname=disk.get('devname', None),
+                            model=disk.get('model', None),
+                            serial=disk.get('serial', None),
+                            subsystem=disk.get('subsystem', None),
+                            size=disk.get('size', None),
+                            rotationrate=disk.get('rotationrate', None),
+                            type=disk.get('type', None),
+                            bus=disk.get('bus', None),
+                            **disk_zfs
+                        )
                     )
-                )
-            db.session.commit()
+                db.session.commit()
+            except IntegrityError:
+                db.session.rollback()
 
 
 def query_disk_temperatures() -> None:
@@ -326,7 +330,7 @@ def database_cleanup():
         filter_before = datetime.utcnow() - timedelta(days=2)
         old_temps = db.session.query(DiskTemp).filter(DiskTemp.create_date <= filter_before).all()
         old_logs = db.session.query(FanLog).filter(FanLog.create_date <= filter_before).all()
-        for row in old_temps.extend(old_logs):
+        for row in old_temps.extend(old_logs or []):
             db.session.delete(row)
         db.session.commit()
 
