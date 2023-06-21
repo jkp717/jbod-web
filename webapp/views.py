@@ -694,6 +694,8 @@ class TaskView(JBODBaseView):
     can_create = False
     can_delete = False
     can_edit = True
+    scheduler_api_jobs = '/scheduler/jobs'
+    list_template = 'task_list.html'
     column_list = ['job_name', 'active', 'seconds', 'minutes', 'hours', 'description', 'last_update']
     column_editable_list = ['active', 'seconds', 'minutes', 'hours']
 
