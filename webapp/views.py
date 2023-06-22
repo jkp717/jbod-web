@@ -415,7 +415,7 @@ class DiskView(JBODBaseView):
                 activate_sys_job('query_disk_properties')
             ]
             flash('Disk properties successfully refreshed.', 'info')
-            if jobs:
+            if any(jobs):
                 flash('Scheduled jobs where activated.', 'info')
         except MissingSchema:
             flash('Disk properties failed to refresh! '
