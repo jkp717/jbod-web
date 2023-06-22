@@ -9,6 +9,7 @@ from flask import current_app
 from flask_apscheduler import APScheduler
 from serial import SerialException, serial_for_url
 from sqlalchemy.exc import IntegrityError
+from requests.exceptions import ConnectionError
 
 from webapp import utils
 from webapp.console import JBODCommand, JBODConsole, JBODConsoleException, JBODRxData, ResetEvent
@@ -23,7 +24,7 @@ _logger = logging.getLogger("apscheduler_jobs")
 def activate_sys_job(job_id: Union[str, int]) -> Optional[Job]:
     with current_app.app_context():
         job = db.session.query(SysJob).where(SysJob.job_id == job_id).first()
-        if not job.active:
+        if job.active:
             aps_job = scheduler.add_job(**job.job_dict)
             job.active = True
             db.session.commit()
@@ -104,9 +105,14 @@ def query_disk_properties() -> None:
         if resp:
             try:
                 zfs_props = _query_zfs_properties()
+                phy_slots = {slot.serial: slot.phy_slot_id for slot in db.session.query(Disk).all()}
+                db.session.query(Disk).delete()
                 for disk in resp.json():
                     disk_zfs = zfs_props.get(disk.get('name'), {})
-                    db.session.merge(
+                    phy_slot_id = None
+                    if disk.get('serial', None):
+                        phy_slot_id = phy_slots.get(disk.get('serial'), None)
+                    db.session.add(
                         Disk(
                             name=disk.get('name', None),
                             devname=disk.get('devname', None),
@@ -117,6 +123,7 @@ def query_disk_properties() -> None:
                             rotationrate=disk.get('rotationrate', None),
                             type=disk.get('type', None),
                             bus=disk.get('bus', None),
+                            phy_slot_id=phy_slot_id,
                             **disk_zfs
                         )
                     )
@@ -131,23 +138,26 @@ def query_disk_temperatures() -> None:
         if not disks:
             _logger.warning("query_disk_temperatures scheduled job skipped. No disks to query.")
             return
-        resp = utils.truenas_api_request(
-            'POST',
-            '/api/v2.0/disk/temperatures',
-            headers={'Content-Type': 'application/json'},
-            data={"names": [disk.name for disk in disks], "powermode": "NEVER"}
-        )
-        if resp.status_code == 200:
-            _logger.debug(f"query_disk_temperatures received a valid response from host; {resp}")
-            for _name, temp in resp.json().items():
-                for disk in disks:
-                    if disk.name == _name:
-                        disk.temperature = temp
-                        disk.last_temp_reading = datetime.utcnow()
-                        break
-            db.session.commit()
-        else:
-            Exception(f"query_disk_temperatures api response code != 200: {resp.status_code}")
+        try:
+            resp = utils.truenas_api_request(
+                'POST',
+                '/api/v2.0/disk/temperatures',
+                headers={'Content-Type': 'application/json'},
+                data={"names": [disk.name for disk in disks], "powermode": "NEVER"}
+            )
+            if resp.status_code == 200:
+                _logger.debug(f"query_disk_temperatures received a valid response from host; {resp}")
+                for _name, temp in resp.json().items():
+                    for disk in disks:
+                        if disk.name == _name:
+                            disk.temperature = temp
+                            disk.last_temp_reading = datetime.utcnow()
+                            break
+                db.session.commit()
+            else:
+                Exception(f"query_disk_temperatures api response code != 200: {resp.status_code}")
+        except ConnectionError:
+            _logger.warning("query_disk_temperatures: unable to connect to Truenas. Is host running?")
 
 
 def _query_zfs_properties() -> dict:
