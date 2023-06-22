@@ -24,7 +24,7 @@ _logger = logging.getLogger("apscheduler_jobs")
 def activate_sys_job(job_id: Union[str, int]) -> Optional[Job]:
     with current_app.app_context():
         job = db.session.query(SysJob).where(SysJob.job_id == job_id).first()
-        if job.active:
+        if not job.active:
             aps_job = scheduler.add_job(**job.job_dict)
             job.active = True
             db.session.commit()

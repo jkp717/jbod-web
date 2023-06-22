@@ -694,8 +694,6 @@ class TaskView(JBODBaseView):
     can_create = False
     can_delete = False
     can_edit = True
-    scheduler_api_jobs = '/scheduler/jobs'
-    list_template = 'task_list.html'
     column_list = [
         'job_name', 'active', 'paused', 'seconds', 'minutes', 'hours', 'description', 'consecutive_failures',
         'last_update'
@@ -709,7 +707,7 @@ class TaskView(JBODBaseView):
         elif job and not model.active:
             scheduler.remove_job(model.job_id)
         elif job and model.active and not is_created:
-            job.reschedule('interval', model.seconds, model.minutes, model.hours)
+            job.reschedule('interval', seconds=model.seconds, minutes=model.minutes, hours=model.hours)
 
 
 class AlertView(JBODBaseView):

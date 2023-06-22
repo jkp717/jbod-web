@@ -1,9 +1,0 @@
-{% extends 'admin/model/list.html' %}
-{% import 'custom_row_actions.html' as custom_row_actions with context %}
-
-
-{% block model_menu_bar_after_filters %}
-<li class="nav-item">
-    <a href="{{ admin_view.scheduler_api_jobs }}" class="nav-link">Job List</a>
-</li>
-{% endblock %}
