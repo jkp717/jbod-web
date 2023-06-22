@@ -23,7 +23,11 @@ config_defaults = {
     'four_pin_rpm_deviation': 50,
     # how long to wait after changing PWM
     # before checking rpm for changes
-    'rpm_read_delay': 0.3
+    'rpm_read_delay': 0.3,
+    # number of consecutive job failures when job schedule is paused
+    'job_max_failures': 3,
+    # minutes until the failed job is resumed
+    'job_paused_minutes': 60
 }
 
 # task scheduler defaults

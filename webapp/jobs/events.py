@@ -1,4 +1,6 @@
 import logging
+import uuid
+from datetime import datetime, timedelta
 
 from webapp import utils, jobs
 from webapp.models import db, Fan, SysJob
@@ -31,11 +33,36 @@ def job_missed_listener(event):
 def job_error_listener(event):
     """Job error event."""
     _logger.error(f"Scheduled job {event.job_id} failed. Error: {event.exception}")
+    with jobs.scheduler.app.app_context():
+        job = db.session.query(SysJob).where(SysJob.job_id == getattr(event, 'job_id')).first()
+        if job:
+            job.consecutive_failures += 1
+            if job.consecutive_failures > int(utils.get_config_value('job_max_failures')):
+                jobs.scheduler.pause_job(event.job_id)
+                job.paused = True
+                pause_minutes = utils.get_config_value('job_paused_minutes')
+                resume_job = {
+                    "id": str(uuid.uuid4()),
+                    "name": "resume_failed_job",
+                    "func": "webapp.jobs:resume_failed_job",
+                    "replace_existing": True,
+                    "args": (event.job_id,),
+                    "run_date": datetime.utcnow() + timedelta(minutes=float(pause_minutes)),
+                }
+                jobs.scheduler.add_job(**resume_job)
+                _logger.warning(f"Scheduled job {event.job_id} reached max consecutive failures. "
+                                f"Pausing job for {pause_minutes} minutes.")
+            db.session.commit()
 
 
 def job_executed_listener(event):
     """Job executed event."""
     _logger.info(f"Scheduled job {event.job_id} executed.")
+    with jobs.scheduler.app.app_context():
+        job = db.session.query(SysJob).where(SysJob.job_id == getattr(event, 'job_id')).first()
+        if job:
+            job.consecutive_failures = 0
+            db.session.commit()
 
 
 def job_added_listener(event):

@@ -46,7 +46,9 @@ class SysJob(db.Model):
     hours = db.Column(db.Integer, default=0)
     job_name = db.Column(db.String)
     description = db.Column(db.String)
+    consecutive_failures = db.Column(db.Integer, default=0)
     active = db.Column(db.Boolean, default=False)
+    paused = db.Column(db.Boolean, default=False)
     create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
 
