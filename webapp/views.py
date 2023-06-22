@@ -696,7 +696,10 @@ class TaskView(JBODBaseView):
     can_edit = True
     scheduler_api_jobs = '/scheduler/jobs'
     list_template = 'task_list.html'
-    column_list = ['job_name', 'active', 'seconds', 'minutes', 'hours', 'description', 'last_update']
+    column_list = [
+        'job_name', 'active', 'paused', 'seconds', 'minutes', 'hours', 'description', 'consecutive_failures',
+        'last_update'
+    ]
     column_editable_list = ['active', 'seconds', 'minutes', 'hours']
 
     def on_model_change(self, form, model, is_created):
@@ -705,6 +708,8 @@ class TaskView(JBODBaseView):
             scheduler.add_job(**model.job_dict)
         elif job and not model.active:
             scheduler.remove_job(model.job_id)
+        elif job and model.active and not is_created:
+            job.reschedule('interval', model.seconds, model.minutes, model.hours)
 
 
 class AlertView(JBODBaseView):
