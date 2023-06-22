@@ -56,7 +56,8 @@ def truenas_api_request(method: str, url_path: str, headers: Optional[dict] = No
                 'accept': '*/*',
                 **headers
             }
-            return requests.request(method, f"{_base_url}{url_path}", headers=_headers, json=data)
+            return requests.request(method, f"{_base_url}{url_path}", headers=_headers, json=data,
+                                    timeout=int(get_config_value('http_requests_timeout')))
         return None
 
 
