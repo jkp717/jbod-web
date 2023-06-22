@@ -265,8 +265,8 @@ class FanView(JBODBaseView):
             content = request.get_json(force=True)
             for sp in content:
                 try:
-                    existing_model = db.session.query(FanSetpoint)\
-                        .where(FanSetpoint.temp == sp['temp'], FanSetpoint.fan_id == sp['fan_id'])\
+                    existing_model = db.session.query(FanSetpoint) \
+                        .where(FanSetpoint.temp == sp['temp'], FanSetpoint.fan_id == sp['fan_id']) \
                         .first()
                     if not existing_model:
                         spm = FanSetpoint(**sp)
@@ -333,8 +333,8 @@ class SetpointView(JBODBaseView):
     def copy_existing(self):
         if request.method == 'POST':
             content = request.get_json(force=True)
-            setpoints = db.session.query(FanSetpoint)\
-                .where(FanSetpoint.fan_id == int(content['copy_id']))\
+            setpoints = db.session.query(FanSetpoint) \
+                .where(FanSetpoint.fan_id == int(content['copy_id'])) \
                 .all()
             for sp in setpoints:
                 try:
@@ -345,7 +345,7 @@ class SetpointView(JBODBaseView):
         fan_id = request.args.get('fan_id')
         if not fan_id:
             return 'fan_id required!', 400
-        fans = db.session.query(Fan).where(Fan.setpoints != None, Fan.id != int(fan_id)).all() # noqa
+        fans = db.session.query(Fan).where(Fan.setpoints != None, Fan.id != int(fan_id)).all()  # noqa
         return self.render('fan/copy_setpoint.html', fans=fans)
 
     def on_model_change(self, form, model, is_created):
@@ -397,6 +397,7 @@ class DiskView(JBODBaseView):
         'last_temp_reading', 'last_update'
     ]
     column_formatters = {'size': utils.disk_size_formatter}
+
     # form_excluded_columns = JBODBaseView.form_excluded_columns + ['disk_temps', ]
 
     def get_empty_list_message(self):
@@ -699,7 +700,7 @@ class TaskView(JBODBaseView):
         'job_name', 'active', 'paused', 'seconds', 'minutes', 'hours', 'description', 'consecutive_failures',
         'last_update'
     ]
-    column_editable_list = ['active', 'seconds', 'minutes', 'hours']
+    column_editable_list = ['active', 'seconds', 'minutes', 'hours', 'paused']
 
     def on_model_change(self, form, model, is_created):
         job = scheduler.get_job(model.job_id)
@@ -728,8 +729,12 @@ class TaskView(JBODBaseView):
                         current_app.logger.error(f"Unable to set provided schedule on job {model.job_id}. "
                                                  f"Reverting to schedule default. Error: {err}")
                         job.reschedule('interval', seconds=model.seconds, minutes=model.minutes, hours=model.hours)
-                        model.paused = False
                         db.session.commit()
+            if 'paused' in form.data.keys():
+                if form.data.get('paused'):
+                    job.pause()
+                else:
+                    job.resume()
 
 
 class AlertView(JBODBaseView):
