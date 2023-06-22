@@ -1,3 +1,4 @@
+import datetime
 import os
 import uuid
 
@@ -13,7 +14,7 @@ from serial.tools.list_ports import comports
 from wtforms.widgets import PasswordInput
 from sqlalchemy.exc import IntegrityError
 
-from webapp import utils
+from webapp import utils, config
 from webapp.console import JBODConsoleException
 from webapp.jobs import scheduler, query_disk_properties, query_controller_properties, \
     truenas_connection_info, get_console, ping_controllers, console_connection_check, activate_sys_job
@@ -703,11 +704,32 @@ class TaskView(JBODBaseView):
     def on_model_change(self, form, model, is_created):
         job = scheduler.get_job(model.job_id)
         if not job and model.active:
+            model.paused = False
             scheduler.add_job(**model.job_dict)
-        elif job and not model.active:
-            scheduler.remove_job(model.job_id)
-        elif job and model.active and not is_created:
-            job.reschedule('interval', seconds=model.seconds, minutes=model.minutes, hours=model.hours)
+        elif job:
+            if not model.active:
+                model.paused = False
+                scheduler.remove_job(model.job_id)
+            else:
+                # job exists and is active, so check if schedule changes
+                mtd = datetime.timedelta(seconds=model.seconds, minutes=model.minutes, hours=model.hours)
+                if mtd != job.trigger.interval:
+                    try:
+                        if mtd == datetime.timedelta(seconds=0, minutes=0, hours=0):
+                            raise Exception("Job schedule must have a least one second, minute, or hour.")
+                        else:
+                            job.reschedule('interval', seconds=model.seconds, minutes=model.minutes, hours=model.hours)
+                    except Exception as err:  # noqa
+                        for cfg in config.scheduler_jobs:
+                            if cfg.get('job_id') == model.job_id:
+                                model.seconds = cfg.get('seconds', 0)
+                                model.minutes = cfg.get('minutes', 0)
+                                model.hours = cfg.get('hours', 0)
+                        current_app.logger.error(f"Unable to set provided schedule on job {model.job_id}. "
+                                                 f"Reverting to schedule default. Error: {err}")
+                        job.reschedule('interval', seconds=model.seconds, minutes=model.minutes, hours=model.hours)
+                        model.paused = False
+                        db.session.commit()
 
 
 class AlertView(JBODBaseView):
