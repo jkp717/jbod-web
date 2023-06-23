@@ -28,7 +28,7 @@ config_defaults = {
     'job_max_failures': 3,
     # minutes until the failed job is resumed
     'job_paused_minutes': 60,
-    'http_requests_timeout': 30
+    'http_requests_timeout': 15
 }
 
 # task scheduler defaults
