@@ -164,6 +164,11 @@ class ControllerLEDRowAction(TemplateLinkRowAction):
         super(ControllerLEDRowAction, self).__init__('custom_row_actions.controller_led')
 
 
+class ControllerResetRowAction(TemplateLinkRowAction):
+    def __init__(self):
+        super(ControllerResetRowAction, self).__init__('custom_row_actions.controller_reset')
+
+
 def get_model_by_id(model, id: Union[str, int], column_name: Optional[str] = 'id'):
     return db.session.query(model).where(getattr(model, column_name) == id).first()
 

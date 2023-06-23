@@ -548,7 +548,11 @@ class ControllerView(JBODBaseView):
     list_template = 'refresh_list.html'
     column_list = ['id', 'mcu_device_id', 'firmware_version', 'fan_port_cnt', 'psu_on', 'alive']
     column_formatters = {'id': utils.controller_id_formatter}
-    column_extra_row_actions = [utils.ControllerAlarmRowAction(), utils.ControllerLEDRowAction()]
+    column_extra_row_actions = [
+        utils.ControllerAlarmRowAction(),
+        utils.ControllerLEDRowAction(),
+        utils.ControllerResetRowAction()
+    ]
 
     def get_empty_list_message(self):
         return Markup(f"<a href={self.get_url('.broadcast')}>Search for connected Controllers</a>")
@@ -601,6 +605,24 @@ class ControllerView(JBODBaseView):
         }
         scheduler.add_job(**sound_alarm_job)
         flash(f"Triggering alarm sound on controller {controller_id}...")
+        return redirect(self.get_url('.index_view'))
+
+    @expose('/reset/<controller_id>', methods=['GET'])
+    def alarm(self, controller_id):
+        """
+        Called by row action; Resets MCU
+        """
+        job_uuid = uuid.uuid4()
+        reset_controller_job = {
+            "id": str(job_uuid),
+            "name": "reset_controller_mcu",
+            "func": "webapp.jobs:reset_controller_mcu",
+            "replace_existing": True,
+            "args": (controller_id,),
+            # omit trigger to run immediately
+        }
+        scheduler.add_job(**reset_controller_job)
+        flash(f"Triggering MCU reset on controller {controller_id}...")
         return redirect(self.get_url('.index_view'))
 
     @expose('/alive', methods=['GET'])

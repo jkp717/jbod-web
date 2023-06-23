@@ -426,6 +426,14 @@ def toggle_controller_led(controller_id: int, duration: int = 10) -> None:
         tty.command_write(JBODCommand.LED_OFF, controller_id, 2)
 
 
+def reset_controller_mcu(controller_id: int) -> None:
+    with scheduler.app.app_context():
+        tty = get_console()
+        if not tty:
+            raise SerialException("Serial connection not established.")
+        tty.command_write(JBODCommand.RESET, controller_id)
+
+
 def _truenas_shutdown(tty: JBODConsole):
     with scheduler.app.app_context():
         _logger.info("Shutdown request received from controller. "

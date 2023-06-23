@@ -43,6 +43,14 @@
 </a>
 {% endmacro %}
 
+{% macro controller_reset(action, row_id, row) %}
+<a class="icon" title="{{ _gettext('Reset MCU') }}" href="{{ get_url('.reset', controller_id=row.id) }}">
+  <i class="mdl-row-icon">
+    {{ svg_html_converter(url_for('static', filename='icons/restart.svg')) }}
+  </i>
+</a>
+{% endmacro %}
+
 {% macro disabled_link(icon_class) %}
 <a class="icon disabled" href="javascript:void(0);">
   <span class="{{ icon_class }}"></span>
