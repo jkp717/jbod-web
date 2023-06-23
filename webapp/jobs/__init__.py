@@ -113,16 +113,28 @@ def truenas_connection_info():
 def query_disk_properties() -> None:
     with scheduler.app.app_context():
         resp = utils.truenas_api_request('GET', '/api/v2.0/disk')
-        if resp:
-            try:
-                zfs_props = _query_zfs_properties()
-                phy_slots = {slot.serial: slot.phy_slot_id for slot in db.session.query(Disk).all()}
-                db.session.query(Disk).delete()
-                for disk in resp.json():
-                    disk_zfs = zfs_props.get(disk.get('name'), {})
-                    phy_slot_id = None
-                    if disk.get('serial', None):
-                        phy_slot_id = phy_slots.get(disk.get('serial'), None)
+        if not resp:
+            return
+        try:
+            zfs_props = _query_zfs_properties()
+            db_serials = [disk.serial for disk in db.session.query(Disk).all()]
+            # db.session.query(Disk).delete()
+            for disk in resp.json():
+                disk_zfs = zfs_props.get(disk.get('name'), {})
+                if disk.get('serial') in db_serials:
+                    model = db.session.query(Disk).filter(Disk.serial == disk.get('serial')).first()
+                    model.name = disk.get('name', None)
+                    model.devname = disk.get('devname', None)
+                    model.model = disk.get('model', None)
+                    model.serial = disk.get('serial', None)
+                    model.subsystem = disk.get('subsystem', None)
+                    model.size = disk.get('size', None)
+                    model.rotationrate = disk.get('rotationrate', None)
+                    model.type = disk.get('type', None)
+                    model.bus = disk.get('bus', None)
+                    for k, v in disk_zfs.items():
+                        setattr(model, k, v)
+                else:
                     db.session.add(
                         Disk(
                             name=disk.get('name', None),
@@ -134,13 +146,13 @@ def query_disk_properties() -> None:
                             rotationrate=disk.get('rotationrate', None),
                             type=disk.get('type', None),
                             bus=disk.get('bus', None),
-                            phy_slot_id=phy_slot_id,
+                            phy_slot_id=None,
                             **disk_zfs
                         )
                     )
-                db.session.commit()
-            except IntegrityError:
-                db.session.rollback()
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
 
 
 def query_disk_temperatures() -> None:
@@ -167,8 +179,9 @@ def query_disk_temperatures() -> None:
                 db.session.commit()
             else:
                 Exception(f"query_disk_temperatures api response code != 200: {resp.status_code}")
-        except ConnectionError:
+        except ConnectionError as err:
             _logger.warning("query_disk_temperatures: unable to connect to Truenas. Is host running?")
+            raise err
 
 
 def _query_zfs_properties() -> dict:
