@@ -118,7 +118,6 @@ def query_disk_properties() -> None:
         try:
             zfs_props = _query_zfs_properties()
             db_serials = [disk.serial for disk in db.session.query(Disk).all()]
-            # db.session.query(Disk).delete()
             for disk in resp.json():
                 disk_zfs = zfs_props.get(disk.get('name'), {})
                 if disk.get('serial') in db_serials:
