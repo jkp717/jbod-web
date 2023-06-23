@@ -1,23 +1,45 @@
+body {
+  /*background: #0000000a;*/
+  background: white;
+  padding-top: 94px;
+}
+
+nav.navbar {
+    width: 100vw;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
+
+.table {
+    background: white;
+}
+
+.row.row-space-evenly {
+    justify-content: space-evenly;
+}
+
 .mdl-fan {
-  display: inline-block;
-  width: 16px;
-  height: 14px;
-  background-image: url(/static/icons/fan.svg);
-  background-position-x: left;
-  background-position-y: bottom;
-  background-repeat: no-repeat;
+    display: inline-block;
+    width: 16px;
+    height: 14px;
+    background-image: url(/static/icons/fan.svg);
+    background-position-x: left;
+    background-position-y: bottom;
+    background-repeat: no-repeat;
 }
 
 .host-status {
-  width: 30px;
+    width: 30px;
 }
 
 .fa.fa-check-circle {
-  color: lightgreen;
+    color: lightgreen;
 }
 
 .fa.fa-question-circle {
-  color: indianred;
+    color: indianred;
 }
 
 .right-justify {
@@ -49,6 +71,13 @@
 
 .no-left-padding {
     padding-left: 0px;
+}
+
+.navbar {
+    /*box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);*/
+    box-shadow: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
+    /*box-shadow: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);*/
+    /*box-shadow: 0 19px 38px rgba(0,0,0,0.30), 0 15px 12px rgba(0,0,0,0.22);*/
 }
 
 .navbar-icon-badge {
@@ -252,7 +281,7 @@ span.nav-link {
     aspect-ratio: 1 / 1;
     fill: #343a40 !important;
     width: 60px;
-    z-index: 1;
+    /*z-index: 1;*/
 }
 
 .mdl-harddisk-grey{
@@ -268,13 +297,16 @@ span.nav-link {
     text-align: center;
 }
 
-.card.outer-card {
-    min-height: 338px;
-}
-
 .chassis-card-title {
     margin-left: 10px;
     margin-top: 20px;
+}
+
+.card.outer-card {
+    min-height: 338px;
+    margin-top: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+    /*box-shadow: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);*/
 }
 
 .chassis-card {
