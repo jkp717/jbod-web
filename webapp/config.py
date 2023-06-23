@@ -31,6 +31,12 @@ config_defaults = {
     'http_requests_timeout': 15
 }
 
+scheduler_job_defaults = {
+    'coalesce': True,
+    'max_instances': 1,
+    'misfire_grace_time': 1
+}
+
 # task scheduler defaults
 scheduler_jobs = [
     {

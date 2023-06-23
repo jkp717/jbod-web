@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from apscheduler.events import EVENT_JOB_MISSED, EVENT_JOB_ERROR, EVENT_JOB_EXECUTED, EVENT_JOB_ADDED, \
     EVENT_JOB_REMOVED, EVENT_JOB_SUBMITTED
 
-from webapp.config import config_defaults, scheduler_jobs
+from webapp.config import config_defaults, scheduler_jobs, scheduler_job_defaults
 
 
 # run the following to start server
@@ -160,6 +160,7 @@ def create_app(debug=False):
     jobs.scheduler.add_listener(jobs.ev.job_added_listener, EVENT_JOB_ADDED)
     jobs.scheduler.add_listener(jobs.ev.job_removed_listener, EVENT_JOB_REMOVED)
     jobs.scheduler.add_listener(jobs.ev.job_submitted_listener, EVENT_JOB_SUBMITTED)
+    app.config['SCHEDULER_JOB_DEFAULTS'] = scheduler_job_defaults
     jobs.scheduler.start()
 
     # add custom functions to jinja environment

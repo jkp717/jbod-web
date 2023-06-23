@@ -608,7 +608,7 @@ class ControllerView(JBODBaseView):
         return redirect(self.get_url('.index_view'))
 
     @expose('/reset/<controller_id>', methods=['GET'])
-    def alarm(self, controller_id):
+    def reset(self, controller_id):
         """
         Called by row action; Resets MCU
         """
