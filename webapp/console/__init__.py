@@ -256,7 +256,6 @@ class JBODConsole:
             self.alive = False
             raise err
 
-
     def writer(self):
         """loop write (thread safe)"""
         try:
