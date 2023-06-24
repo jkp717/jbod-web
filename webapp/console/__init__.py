@@ -235,12 +235,15 @@ class JBODConsole:
                         if self._data_received.count(self.TERMINATOR) > 1:
                             # process the first and send the rest to backlog
                             rx = JBODRxData(bytes(ops[0] + self.TERMINATOR))
-                            self._data_received = bytearray(self.TERMINATOR.join(ops[1:]))
+                            if self._data_received.endswith(self.TERMINATOR):
+                                self._data_received = bytearray(self.TERMINATOR.join(ops[1:]) + self.TERMINATOR)
+                            else:
+                                self._data_received = bytearray(self.TERMINATOR.join(ops[1:]))
                             self.rx_backlog = True
                         else:
-                            rx = JBODRxData(bytes(self._data_received))
+                            rx = JBODRxData(bytes(ops[0] + self.TERMINATOR))
                             try:
-                                self._data_received = bytearray(ops[:1]) or bytearray()
+                                self._data_received = bytearray(ops[1])
                             except IndexError:
                                 self._data_received = bytearray()
                             self.rx_backlog = False
@@ -252,6 +255,7 @@ class JBODConsole:
         except serial.SerialException as err:
             self.alive = False
             raise err
+
 
     def writer(self):
         """loop write (thread safe)"""
