@@ -370,3 +370,36 @@ class Alert(db.Model):
     def __repr__(self):
         if self.category:
             return f"(Alert: {self.id} | Category: {self.category})"
+
+
+# TODO: Add stat tracker
+class ComStat(db.Model):
+    __tablename__ = "com_stat"
+    id = db.Column(db.Integer, primary_key=True)
+    rx_cntr = db.Column(db.Integer, default=0)
+    tx_cntr = db.Column(db.Integer, default=0)
+    err_cntr = db.Column(db.Integer, default=0)
+    # timestamps populated by triggers
+    last_error = db.Column(db.DateTime)
+    last_rx = db.Column(db.DateTime)
+    last_tx = db.Column(db.DateTime)
+
+
+update_rx_date_trigger = db.DDL("""\
+CREATE TRIGGER update_rx_date_tr UPDATE OF rx_cntr ON com_stat
+  BEGIN
+    UPDATE com_stat SET last_rx = DATETIME('now','localtime') WHERE id = NEW.id;
+  END;""")
+update_tx_date_trigger = db.DDL("""\
+CREATE TRIGGER update_tx_date_tr UPDATE OF tx_cntr ON com_stat
+  BEGIN
+    UPDATE com_stat SET last_tx = DATETIME('now','localtime') WHERE id = NEW.id;
+  END;""")
+update_err_date_trigger = db.DDL("""\
+CREATE TRIGGER update_err_date_tr UPDATE OF err_cntr ON com_stat
+  BEGIN
+    UPDATE com_stat SET last_err = DATETIME('now','localtime') WHERE id = NEW.id;
+  END;""")
+db.event.listen(ComStat.__table__, 'after_create', update_rx_date_trigger)
+db.event.listen(ComStat.__table__, 'after_create', update_tx_date_trigger)
+db.event.listen(ComStat.__table__, 'after_create', update_err_date_trigger)
