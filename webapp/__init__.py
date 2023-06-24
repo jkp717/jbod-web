@@ -150,6 +150,7 @@ def create_app(debug=False):
         # clear previous failure flags on jobs
         for job in db.session.query(SysJob).all():
             job.consecutive_failures = 0
+            job.paused = False
         db.session.commit()
 
         # setup console threads for read/writes
