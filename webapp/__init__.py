@@ -147,6 +147,11 @@ def create_app(debug=False):
         for job in db.session.query(SysJob).where(SysJob.active == True).all():  # noqa
             app.config['SCHEDULER_JOBS'].append(job.job_dict)
 
+        # clear previous failure flags on jobs
+        for job in db.session.query(SysJob).all():
+            job.consecutive_failures = 0
+        db.session.commit()
+
         # setup console threads for read/writes
         jobs.get_console()
 
