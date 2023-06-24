@@ -165,6 +165,7 @@ class JBODConsole:
         self.ctrlc = JBODControlCharacter
         self.serial = serial_instance
         self.alive = False
+        self.rx_backlog = False
         self.receiver_thread = None
         self.transmitter_thread = None
         self._reader_alive = False
@@ -223,23 +224,30 @@ class JBODConsole:
             while self.alive and self._reader_alive:
                 # read all that is there or wait for one byte
                 data = self.serial.read(self.serial.in_waiting or 1)
-                if data:
-                    self._data_received.extend(data)
+                # process if new data or existing terminated msg(s) backlogged
+                if data or self.rx_backlog:
+                    if data:
+                        self._data_received.extend(data)
                     if self.TERMINATOR in self._data_received:
                         # Could have backlog of RX messages when reading;
                         # process each separately
+                        ops = list(filter(None, [o for o in self._data_received.strip(b'\x00').split(self.TERMINATOR)]))
                         if self._data_received.count(self.TERMINATOR) > 1:
-                            ops = filter(None, [o for o in self._data_received.strip(b'\x00').split(self.TERMINATOR)])
-                            ops = [bytes(d + self.TERMINATOR) for d in ops]
+                            # process the first and send the rest to backlog
+                            rx = JBODRxData(bytes(ops[0] + self.TERMINATOR))
+                            self._data_received = self.TERMINATOR.join(ops[1:])
+                            self.rx_backlog = True
                         else:
-                            ops = [bytes(self._data_received), ]
-                        self._data_received = bytearray()
-                        for op in ops:
-                            rx = JBODRxData(op)
-                            if rx.ack or rx.nak:
-                                self.rx_buffer = rx
-                            elif self._callback:
-                                self._callback(self, rx, **self._callback_kwargs)
+                            rx = JBODRxData(bytes(self._data_received))
+                            try:
+                                self._data_received = ops[:1] or bytearray()
+                            except IndexError:
+                                self._data_received = bytearray()
+                            self.rx_backlog = False
+                        if rx.ack or rx.nak:
+                            self.rx_buffer = rx
+                        elif self._callback:
+                            self._callback(self, rx, **self._callback_kwargs)
                 time.sleep(0.1)
         except serial.SerialException as err:
             self.alive = False
