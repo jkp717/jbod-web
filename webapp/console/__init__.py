@@ -235,12 +235,12 @@ class JBODConsole:
                         if self._data_received.count(self.TERMINATOR) > 1:
                             # process the first and send the rest to backlog
                             rx = JBODRxData(bytes(ops[0] + self.TERMINATOR))
-                            self._data_received = self.TERMINATOR.join(ops[1:])
+                            self._data_received = bytearray(self.TERMINATOR.join(ops[1:]))
                             self.rx_backlog = True
                         else:
                             rx = JBODRxData(bytes(self._data_received))
                             try:
-                                self._data_received = ops[:1] or bytearray()
+                                self._data_received = bytearray(ops[:1]) or bytearray()
                             except IndexError:
                                 self._data_received = bytearray()
                             self.rx_backlog = False
