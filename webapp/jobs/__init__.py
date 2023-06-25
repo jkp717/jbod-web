@@ -144,6 +144,7 @@ def query_disk_properties() -> None:
     with scheduler.app.app_context():
         resp = utils.truenas_api_request('GET', '/api/v2.0/disk')
         if not resp:
+            _logger.warning("query_disk_properties: no resp returned from GET '/api/v2.0/disk' request.")
             return
         try:
             zfs_props = _query_zfs_properties()
@@ -253,13 +254,16 @@ def query_host_state() -> str:
 def poll_setpoints() -> None:
     # TODO: Figure out a better way of dealing with serial race condition
     with scheduler.app.app_context():
-        scheduler.pause_job('poll_controller_data')
+        job = db.session.query(SysJob).where(SysJob.job_id == 'poll_controller_data').first()
+        if not job.paused:
+            scheduler.pause_job('poll_controller_data')
         # give read thread loop time to clear buffer
         time.sleep(0.2)
         try:
             _poll_setpoints()
         finally:
-            scheduler.resume_job('poll_controller_data')
+            if not job.paused:
+                scheduler.resume_job('poll_controller_data')
 
 
 def _poll_setpoints() -> None:
@@ -418,7 +422,7 @@ def poll_controller_data() -> None:
 
 def _poll_controller_data() -> None:
     """
-    Job to verify controller(s) is responding to poll_controller_data.
+    Job to verify controller(s) are responding to poll_controller_data.
     Updates controllers 'alive' to false if no response is received within
     2x of poll_controller_data scheduled runtime interval.
     """
