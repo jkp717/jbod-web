@@ -395,7 +395,7 @@ class FanLogView(JBODBaseView):
     can_export = True
     can_view_details = False
     column_exclude_list = ['modify_date']
-    column_filters = ['fan', 'create_date']
+    column_filters = ['fan.id', 'fan', 'create_date']
     column_sortable_list = ['create_date', 'fan.id']
     column_default_sort = ('create_date', True)
     column_list = ['create_date', 'fan', 'old_pwm']
