@@ -12,7 +12,7 @@
     <div class="card outer-card">
       <div class="card-body">
         <h5 class="card-title">Enclosures</h5>
-        {% if jbod is none %}
+        {% if jbods is not none %}
           {% for jbod in jbods %}
           <div class="chassis-card-title">
             <h5>{{ jbod.name }}</h5>
