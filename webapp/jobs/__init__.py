@@ -382,7 +382,9 @@ def database_cleanup():
         filter_before = datetime.utcnow() - timedelta(days=2)
         old_temps = db.session.query(DiskTemp).filter(DiskTemp.create_date <= filter_before).all()
         old_logs = db.session.query(FanLog).filter(FanLog.create_date <= filter_before).all()
+        old_stats = db.session.query(FanLog).filter(ComStat.stat_date <= filter_before).all()
         rows = old_temps.extend(old_logs or [])
+        rows = rows.extend(old_stats or [])
         if rows:
             for r in rows:
                 db.session.delete(r)
