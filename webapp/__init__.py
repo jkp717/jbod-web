@@ -147,6 +147,9 @@ def create_app(debug=False):
         for job in db.session.query(SysJob).where(SysJob.active == True).all():  # noqa
             app.config['SCHEDULER_JOBS'].append(job.job_dict)
 
+        # turn on 'always-on' jobs
+        jobs.activate_sys_job('tty_stat_tracker')
+
         # clear previous failure flags on jobs
         for job in db.session.query(SysJob).all():
             job.consecutive_failures = 0

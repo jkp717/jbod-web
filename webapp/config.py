@@ -45,7 +45,7 @@ scheduler_jobs = [
         'job_name': 'Query Disk Properties',
         'description': 'TrueNAS API call to get disk properties.',
         'hours': 1,
-        'can_edit': True
+        'can_edit': True,
     }, {
         'job_id': 'query_disk_temperatures',
         'func': 'webapp.jobs:query_disk_temperatures',
@@ -81,6 +81,7 @@ scheduler_jobs = [
         'job_name': 'Stat Tracker',
         'description': 'Stores Tx/Rx byte counts',
         'hours': 1,
-        'can_edit': False
+        'can_edit': False,
+        'active': True
     }
 ]
