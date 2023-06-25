@@ -176,6 +176,10 @@ class JBODConsole:
         self._lock = threading.Lock()
         self._callback_kwargs = kwargs
 
+        # trackers
+        self.bytes_recv = 0
+        self.bytes_trans = 0
+
     def _start_reader(self):
         """Start reader thread"""
         self._reader_alive = True
@@ -227,6 +231,7 @@ class JBODConsole:
                 # process if new data or existing terminated msg(s) backlogged
                 if data or self.rx_backlog:
                     if data:
+                        self.bytes_recv += len(data)
                         self._data_received.extend(data)
                     if self.TERMINATOR in self._data_received:
                         # Could have backlog of RX messages when reading;
@@ -295,6 +300,7 @@ class JBODConsole:
         b = bytearray(str(fmt_command), self.ENCODING)  # convert str to bytearray
         b.extend(self.TERMINATOR)  # add terminator to end of bytearray
         with self._lock:
+            self.bytes_trans += len(b)
             self.serial.write(bytes(b))  # convert bytearray to bytes
             resp = self.receive_now()
         if not resp.ack:
