@@ -17,7 +17,8 @@ from sqlalchemy.exc import IntegrityError
 from webapp import utils, config
 from webapp.console import JBODConsoleException
 from webapp.jobs import scheduler, query_disk_properties, query_controller_properties, \
-    truenas_connection_info, get_console, ping_controllers, console_connection_check, activate_sys_job
+    truenas_connection_info, get_console, ping_controllers, console_connection_check, activate_sys_job, \
+    deactivate_sys_job
 from webapp.jobs.events import fan_calibration_job_listener
 from webapp.models import db, PhySlot, FanSetpoint, Fan, Controller, SysConfig, Chassis, \
     SysJob, Alert, Disk, ComStat
@@ -580,7 +581,7 @@ class ControllerView(JBODBaseView):
 
     def on_model_delete(self, model):
         """
-        Cascade delete fan models
+        Cascade delete fan models; stop controller jobs if deleting all
         """
         if model.chassis:
             fans = db.session.query(Fan) \
@@ -589,6 +590,11 @@ class ControllerView(JBODBaseView):
             for row in fans:
                 db.session.delete(row)
             db.session.commit()
+        # check if any controllers are left
+        if len(db.session.query(Controller).all()) == 0:
+            # Turn off all jobs related to controllers
+            deactivate_sys_job('poll_controller_data')
+            deactivate_sys_job('poll_setpoints')
 
     @expose('/identify/<controller_id>', methods=['GET'])
     def identify(self, controller_id):

@@ -32,6 +32,17 @@ def activate_sys_job(job_id: Union[str, int]) -> Optional[Job]:
         return None
 
 
+def deactivate_sys_job(job_id: Union[str, int]) -> Optional[Job]:
+    with current_app.app_context():
+        job = db.session.query(SysJob).where(SysJob.job_id == job_id).first()
+        if job.active:
+            aps_job = scheduler.remove_job(job_id)
+            job.active = False
+            db.session.commit()
+            return aps_job
+        return None
+
+
 def resume_failed_job(job_id: Union[str, int]) -> Optional[Job]:
     with current_app.app_context():
         db_job = db.session.query(SysJob).where(SysJob.job_id == job_id).first()
