@@ -44,30 +44,43 @@ scheduler_jobs = [
         'func': 'webapp.jobs:query_disk_properties',
         'job_name': 'Query Disk Properties',
         'description': 'TrueNAS API call to get disk properties.',
-        'hours': 1
+        'hours': 1,
+        'can_edit': True
     }, {
         'job_id': 'query_disk_temperatures',
         'func': 'webapp.jobs:query_disk_temperatures',
         'job_name': 'Query Disk Temperatures',
         'description': 'TrueNAS API call to get disk temperatures.',
-        'minutes': 1
+        'minutes': 1,
+        'can_edit': True
     }, {
         'job_id': 'poll_setpoints',
         'func': 'webapp.jobs:poll_setpoints',
         'job_name': 'Poll Fan Setpoints',
         'description': 'Poll chassis temperature and set fan(s) PWM according to defined setpoint.',
-        'minutes': 2
+        'minutes': 2,
+        'can_edit': True
     }, {
         'job_id': 'poll_controller_data',
         'func': 'webapp.jobs:poll_controller_data',
         'job_name': 'Poll Controller Data',
         'description': 'Poll controller(s) to get latest fan RPM and PWM, as well as PSU Status.',
-        'seconds': 30
+        'seconds': 30,
+        'can_edit': True
     }, {
         'job_id': 'database_cleanup',
         'func': 'webapp.jobs:database_cleanup',
         'job_name': 'Database Cleanup',
         'description': 'Removes old data from database',
-        'hours': 2
+        'hours': 2,
+        'can_edit': True
     },
+    {
+        'job_id': 'tty_stat_tracker',
+        'func': 'webapp.jobs:tty_stat_tracker',
+        'job_name': 'Stat Tracker',
+        'description': 'Stores Tx/Rx byte counts',
+        'hours': 1,
+        'can_edit': False
+    }
 ]

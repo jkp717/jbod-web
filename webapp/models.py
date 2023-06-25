@@ -44,6 +44,7 @@ class SysJob(db.Model):
     seconds = db.Column(db.Integer, default=0)
     minutes = db.Column(db.Integer, default=0)
     hours = db.Column(db.Integer, default=0)
+    can_edit = db.Column(db.Boolean, default=True)  # if user can edit schedule
     job_name = db.Column(db.String)
     description = db.Column(db.String)
     consecutive_failures = db.Column(db.Integer, default=0)
@@ -370,3 +371,14 @@ class Alert(db.Model):
     def __repr__(self):
         if self.category:
             return f"(Alert: {self.id} | Category: {self.category})"
+
+
+class ComStat(db.Model):
+    __tablename__ = "com_stat"
+    id = db.Column(db.Integer, primary_key=True)
+    stat_date = db.Column(db.Date)
+    rx = db.Column(db.Integer, default=0)
+    tx = db.Column(db.Integer, default=0)
+    err = db.Column(db.Integer, default=0)
+    create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)

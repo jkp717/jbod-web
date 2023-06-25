@@ -20,7 +20,7 @@ from webapp.jobs import scheduler, query_disk_properties, query_controller_prope
     truenas_connection_info, get_console, ping_controllers, console_connection_check, activate_sys_job
 from webapp.jobs.events import fan_calibration_job_listener
 from webapp.models import db, PhySlot, FanSetpoint, Fan, Controller, SysConfig, Chassis, \
-    SysJob, Alert, Disk
+    SysJob, Alert, Disk, ComStat
 
 
 class JBODBaseView(ModelView):
@@ -36,6 +36,9 @@ class JBODBaseView(ModelView):
             excluded_columns=self.column_exclude_list,
         )
 
+    def is_editable_row(self, row, name):
+        return name in self.column_editable_list and self.can_edit
+
 
 class IndexView(BaseView):
 
@@ -50,13 +53,31 @@ class IndexView(BaseView):
             'chassis': utils.get_model_by_id(Chassis, 1) is not None,
             'jobs': len(db.session.query(SysJob).where(SysJob.active == False).all()) == 0,  # noqa
         }
+        tty = get_console()
+        if not tty:
+            tty_stats = {'tx': {'hr': 0, 'day': 0}, 'rx': {'hr': 0, 'day': 0}}
+        else:
+            stats = db.session.query(ComStat)\
+                .filter(ComStat.stat_date == datetime.datetime.today().date())\
+                .first()
+            tty_stats = {
+                'tx': {
+                    'hr': tty.bytes_trans,
+                    'day': stats.tx if stats else tty.bytes_trans,
+                },
+                'rx': {
+                    'hr': tty.bytes_recv,
+                    'day': stats.rx if stats else tty.bytes_recv,
+                }
+            }
         jbods = db.session.query(Chassis).where(Chassis.controller_id is not None).all()  # noqa
         return self.render(
             'index.html',
             setup_complete=all(setup_required),
             setup_required=setup_required,
             jbods=jbods,
-            disk_tooltip=['name', 'serial', 'temperature']
+            disk_tooltip=['name', 'serial', 'temperature'],
+            tty_stats=tty_stats
         )
 
 
@@ -718,11 +739,19 @@ class TaskView(JBODBaseView):
     can_create = False
     can_delete = False
     can_edit = True
+    list_template = 'list.html'
     column_list = [
         'job_name', 'active', 'paused', 'seconds', 'minutes', 'hours', 'description', 'consecutive_failures',
         'last_update'
     ]
     column_editable_list = ['active', 'seconds', 'minutes', 'hours', 'paused']
+
+    def is_editable_row(self, row, name):
+        if not row.can_edit:
+            _column_editable_list = list(set(self.column_editable_list) - {'seconds', 'minutes', 'hours'})
+            print(_column_editable_list)
+            return name in _column_editable_list and self.can_edit
+        return name in self.column_editable_list and self.can_edit
 
     def on_model_change(self, form, model, is_created):
         job = scheduler.get_job(model.job_id)

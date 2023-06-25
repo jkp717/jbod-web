@@ -15,7 +15,7 @@ from webapp import utils
 from webapp.console import JBODCommand, JBODConsole, JBODConsoleException, JBODRxData, ResetEvent
 from webapp.jobs import events as ev
 from webapp.models import db, SysConfig, Disk, DiskTemp, Chassis, Fan, FanSetpoint, Controller, \
-    PhySlot, SysJob, FanLog
+    PhySlot, SysJob, FanLog, ComStat
 
 scheduler = APScheduler()
 _logger = logging.getLogger("apscheduler_jobs")
@@ -41,6 +41,25 @@ def resume_failed_job(job_id: Union[str, int]) -> Optional[Job]:
             db.session.commit()
             return resumed_job
         return None
+
+
+def tty_stat_tracker():
+    """
+    Stores tx/rx byte tracker hourly into db from memory;
+    clears memory tracker
+    """
+    with scheduler.app.app_context():
+        tty = get_console()
+        if not tty:
+            return None
+        curr_stat = db.session.query(ComStat).filter(ComStat.stat_date == datetime.today().date()).first()
+        if not curr_stat:
+            curr_stat = ComStat(stat_date=datetime.today().date())
+        curr_stat.rx += tty.bytes_recv
+        curr_stat.tx += tty.bytes_trans
+        tty.bytes_recv = 0
+        tty.bytes_trans = 0
+        db.session.commit()
 
 
 def get_console() -> Union[JBODConsole, None]:

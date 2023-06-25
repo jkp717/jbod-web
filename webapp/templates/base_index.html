@@ -12,26 +12,60 @@
     <div class="card outer-card">
       <div class="card-body">
         <h5 class="card-title">Enclosures</h5>
-        {% for jbod in jbods %}
-        <div class="chassis-card-title">
-          <h5>{{ jbod.name }}</h5>
-        </div>
-        <div class="card chassis-card">
-          <div class="card-body">
-            <div class="card-shelf">
-              {% for slot in jbod.phy_slots %}
-              <div class="card-icon">
-                {% with disk = slot.disk %}
-                <i class="mdl-harddisk{{ '-grey' if disk is none else '' }}" data-toggle="popover" title="Slot-{{ slot.phy_slot }} {% if disk is not none %}({{ disk.name }}){% endif %}" data-content="{{ disk_tooltip_html(slot.disk) }}">
-                {{ svg_html_converter(url_for('static', filename='icons/harddisk.svg')) }}
-                </i>
-                {% endwith %}
+        {% if jbod is none %}
+          {% for jbod in jbods %}
+          <div class="chassis-card-title">
+            <h5>{{ jbod.name }}</h5>
+          </div>
+          <div class="card chassis-card">
+            <div class="card-body">
+              <div class="card-shelf">
+                {% for slot in jbod.phy_slots %}
+                <div class="card-icon">
+                  {% with disk = slot.disk %}
+                  <i class="mdl-harddisk{{ '-grey' if disk is none else '' }}" data-toggle="popover" title="Slot-{{ slot.phy_slot }} {% if disk is not none %}({{ disk.name }}){% endif %}" data-content="{{ disk_tooltip_html(slot.disk) }}">
+                  {{ svg_html_converter(url_for('static', filename='icons/harddisk.svg')) }}
+                  </i>
+                  {% endwith %}
+                </div>
+                {% endfor %}
               </div>
-              {% endfor %}
             </div>
           </div>
-        </div>
-        {% endfor %}
+          {% endfor %}
+        {% else %}
+          <p class="card-text"><i class="support-text">No enclosures setup</i></p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-auto">
+    <div class="card outer-card">
+      <div class="card-body">
+        <h5 class="card-title">Controller(s) Stats</h5>
+        <p class="card-text"><i class="support-text">Data bytes send/received by all controllers</i></p>
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col"></th>
+              <th scope="col">1 Hr</th>
+              <th scope="col">24 Hr</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Tx (Bytes)</th>
+              <td>{{ tty_stats.tx.hr}}</td>
+              <td>{{ tty_stats.tx.day}}</td>
+            </tr>
+            <tr>
+              <th scope="row">Rx (Bytes)</th>
+              <td>{{ tty_stats.rx.hr}}</td>
+              <td>{{ tty_stats.rx.day}}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
