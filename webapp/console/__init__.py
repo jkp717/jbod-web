@@ -268,6 +268,7 @@ class JBODConsole:
                 if self.NEW_TX_DATA:
                     with self._lock:
                         self.serial.write(self.tx_buffer)
+                        self.bytes_trans += len(self.tx_buffer)
                     self.tx_buffer = None  # clear buffer once transmitted
                 time.sleep(0.1)
         except Exception as err:
