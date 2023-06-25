@@ -20,7 +20,7 @@ config_defaults = {
     'log_path': None,
     # abs rpm difference after testing pwm +/- 10
     # fan is a four_pin if > this value
-    'four_pin_rpm_deviation': 50,
+    'four_pin_rpm_deviation': 100,
     # how long to wait after changing PWM
     # before checking rpm for changes
     'rpm_read_delay': 0.3,
