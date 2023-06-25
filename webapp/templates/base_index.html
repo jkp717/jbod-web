@@ -6,9 +6,41 @@
 {% endblock %}
 
 {% block body %}
+<div class="index-container">
 <div class="row">
   {% block new_setup_card %}{% endblock %}
-  <div class="col-auto">
+  <div class="col-sm-12 col-6">
+    <div class="card outer-card">
+      <div class="card-body">
+        <h5 class="card-title">Controller(s) Stats</h5>
+        <p class="card-text"><i class="support-text">Data bytes send/received by all controllers</i></p>
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col"></th>
+              <th scope="col">1 Hr</th>
+              <th scope="col">24 Hr</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Tx (Bytes)</th>
+              <td>{{ tty_stats.tx.hr}}</td>
+              <td>{{ tty_stats.tx.day}}</td>
+            </tr>
+            <tr>
+              <th scope="row">Rx (Bytes)</th>
+              <td>{{ tty_stats.rx.hr}}</td>
+              <td>{{ tty_stats.rx.day}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row">
+  <div class="col-12">
     <div class="card outer-card">
       <div class="card-body">
         <h5 class="card-title">Enclosures</h5>
@@ -39,36 +71,7 @@
       </div>
     </div>
   </div>
-
-  <div class="col-auto">
-    <div class="card outer-card">
-      <div class="card-body">
-        <h5 class="card-title">Controller(s) Stats</h5>
-        <p class="card-text"><i class="support-text">Data bytes send/received by all controllers</i></p>
-        <table class="table">
-          <thead>
-            <tr>
-              <th scope="col"></th>
-              <th scope="col">1 Hr</th>
-              <th scope="col">24 Hr</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <th scope="row">Tx (Bytes)</th>
-              <td>{{ tty_stats.tx.hr}}</td>
-              <td>{{ tty_stats.tx.day}}</td>
-            </tr>
-            <tr>
-              <th scope="row">Rx (Bytes)</th>
-              <td>{{ tty_stats.rx.hr}}</td>
-              <td>{{ tty_stats.rx.day}}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
+</div>
 </div>
 {% endblock %}
 
