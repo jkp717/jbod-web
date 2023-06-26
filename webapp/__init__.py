@@ -148,7 +148,9 @@ def create_app(debug=False):
             app.config['SCHEDULER_JOBS'].append(job.job_dict)
 
         # turn on 'always-on' jobs
-        jobs.activate_sys_job('tty_stat_tracker')
+        for cfg in config.scheduler_jobs:
+            if cfg.get('active', None):
+                jobs.activate_sys_job(cfg.get('job_id'))
 
         # clear previous failure flags on jobs
         for job in db.session.query(SysJob).all():
