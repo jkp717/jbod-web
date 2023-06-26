@@ -62,14 +62,17 @@ def tty_stat_tracker():
     with scheduler.app.app_context():
         tty = get_console()
         if not tty:
+            _logger.info("tty_at_tracker: no COM connection established; skipping job.")
             return None
+        _logger.debug("tty_at_tracker: storing COM stats to database.")
         curr_stat = db.session.query(ComStat).filter(ComStat.stat_date == datetime.today().date()).first()
         if not curr_stat:
             curr_stat = ComStat(stat_date=datetime.today().date())
+            db.session.add(curr_stat)
+            db.session.flush()
         curr_stat.rx += tty.bytes_recv
         curr_stat.tx += tty.bytes_trans
-        tty.bytes_recv = 0
-        tty.bytes_trans = 0
+        tty.bytes_recv, tty.bytes_trans = 0, 0
         db.session.commit()
 
 
