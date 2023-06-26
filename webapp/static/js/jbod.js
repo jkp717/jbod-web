@@ -1,9 +1,12 @@
 $(function () {
+    $('#connStatusPopover').find('.navbar-icon-badge').text($('#connStatusPopover').find('.popover-content-attr.disconnected').length);
     // delay updating alert badge to give ws time to connect
     setTimeout(function() {
         // check for any disconnected children and update badge icon flag
         if ($('#connStatusPopover').find('.popover-content-attr.disconnected').length > 0) {
             $('#connStatusPopover').addClass('navbar-icon-alert');
+            // update the counter in the icon badge
+            $('#connStatusPopover').find('.navbar-icon-badge').text($('#connStatusPopover').find('.popover-content-attr.disconnected').length);
         } else {
             $('#connStatusPopover').removeClass('navbar-icon-alert');
         }
