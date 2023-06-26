@@ -9,7 +9,7 @@
 <div class="index-container">
 <div class="row">
   {% block new_setup_card %}{% endblock %}
-  <div class="col-sm-12 col-6">
+  <div class="col-lg-6 col-md-12">
     <div class="card outer-card">
       <div class="card-body">
         <h5 class="card-title">Controller(s) Stats</h5>
@@ -44,7 +44,7 @@
     <div class="card outer-card">
       <div class="card-body">
         <h5 class="card-title">Enclosures</h5>
-        {% if jbods is not none %}
+        {% if jbods %}
           {% for jbod in jbods %}
           <div class="chassis-card-title">
             <h5>{{ jbod.name }}</h5>
@@ -66,7 +66,7 @@
           </div>
           {% endfor %}
         {% else %}
-          <p class="card-text"><i class="support-text">No enclosures setup</i></p>
+          <p class="card-text"><i class="support-text">No enclosures configured</i></p>
         {% endif %}
       </div>
     </div>
