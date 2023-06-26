@@ -81,7 +81,7 @@ scheduler_jobs = [
         'job_name': 'Stat Tracker',
         'description': 'Stores Tx/Rx byte counts',
         'hours': 1,
-        'can_edit': False,
+        'can_edit': False,  # prevents user from being able to change times
         'active': True
     }
 ]
