@@ -748,10 +748,12 @@ class TaskView(JBODBaseView):
     list_template = 'list.html'
     column_list = [
         'job_name', 'active', 'paused', 'seconds', 'minutes', 'hours', 'description', 'consecutive_failures',
-        'last_update'
+        'next_run', 'last_update'
     ]
     conditional_edit_columns = ['seconds', 'minutes', 'hours']
     column_editable_list = ['active', 'seconds', 'minutes', 'hours', 'paused']
+    column_formatters = {'next_run': utils.next_job_runtime_formatter}
+    column_extra_row_actions = [utils.RunJobRowAction()]
 
     def is_editable_row(self, row, name):
         if not row.can_edit:
@@ -792,6 +794,23 @@ class TaskView(JBODBaseView):
                     job.pause()
                 else:
                     job.resume()
+
+    @expose('/run', methods=['GET'])
+    def run(self):
+        """
+        Triggers job to run now
+        """
+        if not request.args.get('job_id'):
+            flash("job_id url parameter required!", category='error')
+            return redirect(self.get_url('.index_view'))
+        job = scheduler.get_job(request.args.get('job_id'))
+        if not job:
+            flash(f"job {request.args.get('job_id')} not found in scheduler! "
+                  f"Make sure the job is active.", category='warning')
+            return redirect(self.get_url('.index_view'))
+        job.modify(next_run_time=datetime.datetime.now())
+        flash(f"Job {request.args.get('job_id')} triggered!")
+        return redirect(self.get_url('.index_view'))
 
 
 class AlertView(JBODBaseView):

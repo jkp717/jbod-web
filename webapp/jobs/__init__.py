@@ -399,11 +399,10 @@ def query_controller_properties(controller: Controller) -> Controller:
 def database_cleanup():
     with scheduler.app.app_context():
         filter_before = datetime.utcnow() - timedelta(days=2)
-        old_temps = db.session.query(DiskTemp).filter(DiskTemp.create_date <= filter_before).all()
-        old_logs = db.session.query(FanLog).filter(FanLog.create_date <= filter_before).all()
-        old_stats = db.session.query(FanLog).filter(ComStat.stat_date <= filter_before).all()
-        rows = old_temps.extend(old_logs or [])
-        rows = rows.extend(old_stats or [])
+        old_temps = db.session.query(DiskTemp).filter(DiskTemp.create_date <= filter_before).all() or []
+        old_logs = db.session.query(FanLog).filter(FanLog.create_date <= filter_before).all() or []
+        old_stats = db.session.query(ComStat).filter(ComStat.stat_date <= filter_before).all() or []
+        rows = old_temps + old_logs + old_stats
         if rows:
             for r in rows:
                 db.session.delete(r)

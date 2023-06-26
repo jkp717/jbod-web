@@ -51,6 +51,14 @@
 </a>
 {% endmacro %}
 
+{% macro run_job_now(action, row_id, row) %}
+<a class="icon" title="{{ _gettext('Run Now') }}" href="{{ get_url('.run', job_id=row.job_id) }}">
+  <i class="mdl-row-icon">
+    {{ svg_html_converter(url_for('static', filename='icons/restart.svg')) }}
+  </i>
+</a>
+{% endmacro %}
+
 {% macro disabled_link(icon_class) %}
 <a class="icon disabled" href="javascript:void(0);">
   <span class="{{ icon_class }}"></span>

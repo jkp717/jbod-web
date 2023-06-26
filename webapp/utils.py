@@ -15,6 +15,7 @@ from flask_admin.model.template import TemplateLinkRowAction
 from sqlalchemy.exc import IntegrityError
 
 from webapp.models import db, FanSetpoint, SysConfig, Disk, Alert, Chassis, PhySlot
+from webapp import jobs
 
 
 class StatusFlag(IntEnum):
@@ -117,6 +118,23 @@ def disk_link_formatter(view, context, model, name):  # noqa
     return getattr(model, name)
 
 
+def next_job_runtime_formatter(view, context, model, name):  # noqa
+    if model.active:
+        job = jobs.scheduler.get_job(getattr(model, 'job_id'))
+        if job:
+            delta = job.next_run_time.replace(tzinfo=None) - datetime.now()
+            delta_txt = ""
+            if int(delta.days) > 0:
+                return f"{int(delta.days)} Day(s)"
+            if delta.seconds >= 3600:
+                delta_txt += f"{int(delta.seconds / 3600)}h "
+            if int(delta.seconds) > 60:
+                delta_txt += f"{int(delta.seconds / 60)}m "
+            if int(delta.seconds) > 0:
+                delta_txt += f"{(delta.seconds % 60)}s "
+            return delta_txt
+    return None
+
 def datetime_formatter(view, value, name):  # noqa
     with current_app.app_context():
         value = value.replace(tzinfo=tz.gettz('UTC'))
@@ -167,6 +185,11 @@ class ControllerLEDRowAction(TemplateLinkRowAction):
 class ControllerResetRowAction(TemplateLinkRowAction):
     def __init__(self):
         super(ControllerResetRowAction, self).__init__('custom_row_actions.controller_reset')
+
+
+class RunJobRowAction(TemplateLinkRowAction):
+    def __init__(self):
+        super(RunJobRowAction, self).__init__('custom_row_actions.run_job_now')
 
 
 def get_model_by_id(model, id: Union[str, int], column_name: Optional[str] = 'id'):
