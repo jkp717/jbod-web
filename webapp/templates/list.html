@@ -31,8 +31,10 @@
             {% else %}
             {{ form[c](pk=get_pk_value(row), display_value=get_value(row, c)) }}
             {% endif %}
+        {% elif c in admin_view.conditional_edit_columns %}
+            <span class="disabled-edit">{{ get_value(row, c) }}</span>
         {% else %}
-        {{ get_value(row, c) }}
+            {{ get_value(row, c) }}
         {% endif %}
         </td>
     {% endfor %}

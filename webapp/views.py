@@ -750,12 +750,12 @@ class TaskView(JBODBaseView):
         'job_name', 'active', 'paused', 'seconds', 'minutes', 'hours', 'description', 'consecutive_failures',
         'last_update'
     ]
+    conditional_edit_columns = ['seconds', 'minutes', 'hours']
     column_editable_list = ['active', 'seconds', 'minutes', 'hours', 'paused']
 
     def is_editable_row(self, row, name):
         if not row.can_edit:
-            _column_editable_list = list(set(self.column_editable_list) - {'seconds', 'minutes', 'hours'})
-            print(_column_editable_list)
+            _column_editable_list = list(set(self.column_editable_list) - set(self.conditional_edit_columns))
             return name in _column_editable_list and self.can_edit
         return name in self.column_editable_list and self.can_edit
 
