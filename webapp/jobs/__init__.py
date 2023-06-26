@@ -97,7 +97,8 @@ def get_console() -> Union[JBODConsole, None]:
             except SerialException as err:
                 # store JBODConsole instance as app attr
                 current_app.__setattr__('console', None)
-                current_app.logger.error(err)
+                _logger.error("An error occurred while attempting to connect with controller.")
+                _logger.error(err)
     return getattr(current_app, 'console')
 
 
@@ -351,7 +352,7 @@ def ping_controllers(controller_id: Optional[int] = None) -> Union[list[dict], l
                 resp.append({"id": next_id, "mcu_device_id": str(dev_id.data)})
             except JBODConsoleException as err:
                 if next_id == 1:
-                    current_app.logger.error(f"Controller on {tty.serial.port} did not respond to ID request. {err}")
+                    _logger.error(f"Controller on {tty.serial.port} did not respond to ID request. {err}")
                 break
             if next_id == controller_id:
                 break
