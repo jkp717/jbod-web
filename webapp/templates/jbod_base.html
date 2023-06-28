@@ -29,11 +29,11 @@
     </a>
     <div class="navbar-sidebar-content">
         <span class="close-sidebar" onclick="closeAlertSidebar();">&times;</span>
-        <span class="sidebar-subtext-link" onclick="deleteAllAlerts('{{ get_url('alerts.delete_alert', alert_id='all') }}');">Clear All</span>
+        <span class="sidebar-subtext-link" onclick="deleteAllSidebarAlerts('{{ get_url('alerts.delete_alert', alert_id='all') }}');">Clear All</span>
         <ul>
-        {% for alert in alerts %}
+<!--        {% for alert in alerts %}
           <li><div><b>{{alert.category|safe }}:</b><span class="close-alert" onclick="deleteAlert(this, {{ alert.id }}, '{{ get_url('alerts.delete_alert', alert_id=alert.id) }}');">&times;</span></div>{{ alert.content|safe }}</li>
-        {% endfor %}
+        {% endfor %}-->
         </ul>
     </div>
 </span>
@@ -65,6 +65,9 @@ $(function () {
 
   // sets up 10 sec polling for console status
   pollConsoleStatus("{{ get_url('controller.alive') }}", 10000);
+
+  // sets up 3 sec polling for alerts
+  pollSidebarAlerts("{{ get_url('alerts.get_alert', alert_id='all') }}", 3000);
 });
 </script>
 {% endblock %}

@@ -380,6 +380,9 @@ class Alert(db.Model):
             return self.modify_date
         return self.create_date
 
+    def as_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
     def __repr__(self):
         if self.category:
             return f"(Alert: {self.id} | Category: {self.category})"

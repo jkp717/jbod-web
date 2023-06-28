@@ -841,3 +841,20 @@ class AlertView(JBODBaseView):
         db.session.delete(alert)
         db.session.commit()
         return jsonify({"result": "success"}), 200
+
+    @expose('/get/<alert_id>', methods=['GET'])
+    def get_alert(self, alert_id):
+        if str(alert_id).upper() == 'ALL':
+            alerts = db.session.query(Alert).all()
+            return jsonify([alert.as_dict() for alert in alerts]), 200
+        alert = utils.get_model_by_id(Alert, int(alert_id))
+        if alert:
+            return jsonify([alert]), 200
+        return jsonify({"result": "error"}), 400
+
+    @expose('/add', methods=['POST'])
+    def add_alert(self):
+        content = request.get_json(force=True)
+        db.session.add(Alert(**content))
+        db.session.commit()
+        return jsonify({"result": "success"}), 200

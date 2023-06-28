@@ -1,4 +1,7 @@
 $(function () {
+    // keep for testing
+    // addSidebarAlert('/alerts/add', {category: 'error', content: 'test message'});
+
     $('#connStatusPopover').find('.navbar-icon-badge').text($('#connStatusPopover').find('.popover-content-attr.disconnected').length);
     // delay updating alert badge to give ws time to connect
     setTimeout(function() {
@@ -131,9 +134,9 @@ function closeAlertSidebar() {
     $('.navbar-sidebar-content').removeClass('show-sidebar');
 }
 
-function deleteAlert(event, alertId, deleteAlertUrl) {
+function deleteSidebarAlert(event, alertId, deleteAlertUrl) {
     $.ajax({
-    url: deleteAlertUrl,
+    url: deleteAlertUrl + "/" + alertId,
     type: 'DELETE',
     success: function(result) {
         $(event).parent().parent().hide("fast");  // animation hiding element
@@ -149,7 +152,7 @@ function deleteAlert(event, alertId, deleteAlertUrl) {
     });
 }
 
-function deleteAllAlerts(deleteAllAlertsUrl) {
+function deleteAllSidebarAlerts(deleteAllAlertsUrl) {
     $.ajax({
     url: deleteAllAlertsUrl,
     type: 'DELETE',
@@ -204,6 +207,77 @@ function pollConsoleStatus(pollUrl, pollInterval) {
             setTimeout(function() { pollConsoleStatus(pollUrl, pollInterval) }, pollInterval);
         }
     });
+}
+
+function addSidebarAlert(addURL, alertData) {
+    $.ajax({
+        url: addURL,
+        type: 'POST',
+        data: JSON.stringify(alertData),
+        dataType: 'json',
+        success: function(result) {
+            console.log(result);
+        }
+    });
+}
+
+function pollSidebarAlerts(pollUrl, pollInterval) {
+    const ulContainer = document.querySelector("div.navbar-sidebar-content > ul");
+    $.ajax({
+        url: pollUrl,
+        type: 'GET',
+        dataType: 'json',
+        success: function(result) {
+            for (let i = 0; i < result.length; i++) {
+                if ( $(ulContainer).find("[data-id='" + result[i].id + "']").length == 0 ) {
+                    $('#alertSidebar').addClass("navbar-icon-alert");
+                    const li = document.createElement("li");
+                    li.dataset.id = result[i].id;
+                    const div = document.createElement("div");
+                    const b = document.createElement("b")
+                    b.innerHTML = result[i].category;
+                    const span = document.createElement("span");
+                    span.className = "close-alert";
+                    span.setAttribute("onclick", "deleteSidebarAlert(this," + result[i].id + ", '/alerts/delete');");
+                    span.innerHTML = "&times;";
+                    div.appendChild(b);
+                    div.appendChild(span);
+                    li.appendChild(div);
+                    li.innerHTML += result[i].content + " " + result[i].id;
+                    ulContainer.appendChild(li);
+
+                    // increment counter
+                    $('#alertSidebar > a > .navbar-icon-badge').text($(ulContainer).find('li').length);
+                }
+            }
+            // must be inside response callback function
+            setTimeout(function() { pollSidebarAlerts(pollUrl, pollInterval) }, pollInterval);
+        }
+    });
+}
+
+function createAlertElements(alertType, message) {
+    const alertContainer = document.getElementById("alert-container");
+
+    const div = document.createElement("div");
+    div.className = "alert alert-" + alertType + " alert-dismissible fade show";
+    div.setAttribute("role", "alert");
+
+    const msgSpan = document.createElement("span");
+    msgSpan.innerHTML = message;
+
+    const btn = document.createElement("button");
+    btn.className = "close";
+    btn.setAttribute("type", "button");
+    btn.setAttribute("data-dismiss", "alert");
+
+    const span = document.createElement("span");
+    span.innerHTML = '&times;'
+
+    div.appendChild(msgSpan);
+    btn.appendChild(span);
+    div.appendChild(btn);
+    alertContainer.appendChild(div);
 }
 
 function updateStatusIcon(options) {
@@ -341,8 +415,8 @@ function fanCalibrationHandler(requestURL, fanId) {
           if (XHR.status == 200) {
             let jobId = JSON.parse(XHR.responseText)['job']['id'];
             $('.calibration-progress-modal[data-fan="' + fanId + '"]').modal('show');
-            console.log("width of parent " + progressBar.parent().width());
-            console.log("starting width of " + Math.round(progressBar.parent().width() * 0.3) + "px");
+//            console.log("width of parent " + progressBar.parent().width());
+//            console.log("starting width of " + Math.round(progressBar.parent().width() * 0.3) + "px");
             progressBar.animate(
                 {
                   width: Math.round(progressBar.parent().width() * 0.3) + "px"
