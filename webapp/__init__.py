@@ -175,9 +175,13 @@ def create_app(debug=False):
     jobs.scheduler.start()
 
     # add custom functions to jinja environment
-    app.jinja_env.globals.update(truenas_connection_info=jobs.truenas_connection_info)
-    app.jinja_env.globals.update(get_serial_connection=jobs.console_connection_check)
-    app.jinja_env.globals.update(disk_tooltip_html=utils.disk_tooltip_html)
-    app.jinja_env.globals.update(svg_html_converter=utils.svg_html_converter)
-    app.jinja_env.globals.update(get_alerts=utils.get_alerts)
+    app.jinja_env.globals.update(**dict(
+        truenas_connection_info=jobs.truenas_connection_info,
+        get_serial_connection=jobs.console_connection_check,
+        disk_tooltip_html=utils.disk_tooltip_html,
+        svg_html_converter=utils.svg_html_converter,
+        get_alerts=utils.get_alerts,
+        fan_watchdog=utils.fan_watchdog,
+        fan_tooltip_html=utils.fan_tooltip_html
+    ))
     return app

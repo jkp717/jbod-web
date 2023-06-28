@@ -2,7 +2,7 @@ import logging
 import math
 import os
 import csv
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import IntEnum
 from typing import Optional, Iterable, Union
 
@@ -14,7 +14,7 @@ from flask_admin.model import typefmt
 from flask_admin.model.template import TemplateLinkRowAction
 from sqlalchemy.exc import IntegrityError
 
-from webapp.models import db, FanSetpoint, SysConfig, Disk, Alert, Chassis, PhySlot
+from webapp.models import db, FanSetpoint, SysConfig, Disk, Alert, Chassis, PhySlot, Fan
 from webapp import jobs
 
 
@@ -70,6 +70,39 @@ def disk_tooltip_html(model: Optional[Disk]) -> str:
     return f"""
     <a href="{url_for('disk.index_view', flt1_physlot_chassis_name_empty=1)}" class=disk-tooltip-item>Add Disk</a>
     """
+
+
+def fan_tooltip_html(model: Optional[Fan]) -> str:
+    if model:
+        if model.active:
+            cnt = len(model.logs)
+            filter_txt = 'flt1_fan_fan_id_equals'
+            if fan_watchdog(model):
+                # watchdog triggered
+                dt = datetime.utcnow() - model.last_report
+                hours, remainder = divmod(dt.seconds, 3600)
+                minutes, seconds = divmod(remainder, 60)
+                time_dif = f'{str(int(hours)) + "h"} {str(int(minutes)) + "m"} {str(int(seconds)) + "s"}'
+                return f"""<h5>Alert!</h5><div><i>Last RPM report</i></div><h6>{time_dif} ago</h6>"""
+            return f"""<h5>{model.rpm} RPM</h5>
+            <div><a href="{url_for('fan.details_view', id=model.id)}">View Fan</a></div>
+            <div><a class="list-model-link" href='{url_for("fan/log.index_view")}?{filter_txt}={model.id}'>
+                View Logs ({cnt})
+            </a></div>"""
+    return f"""
+    <i>No active fan on this port.</i>
+    """
+
+
+def fan_watchdog(model: Fan) -> bool:
+    """
+    Fan Window Watchdog Timer - Returns bool if fan does not update within set window
+    """
+    with current_app.app_context():
+        trigger_dt = model.last_report + timedelta(seconds=int(get_config_value('fan_alert_after_seconds')))
+        if trigger_dt < datetime.utcnow():
+            return True
+        return False
 
 
 def svg_html_converter(path: str) -> str:

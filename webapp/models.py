@@ -117,7 +117,7 @@ update_disk_temp_trigger = db.DDL("""\
 CREATE TRIGGER update_disk_temp_tr UPDATE OF temp ON disk
   BEGIN
     INSERT INTO disk_temp (temp, disk_serial, create_date) 
-    VALUES (NEW.temp, NEW.disk_serial, DATETIME('now','localtime'));
+    VALUES (NEW.temp, NEW.disk_serial, DATETIME('now'));
   END;""")
 db.event.listen(Disk.__table__, 'after_create', update_disk_temp_trigger)
 
@@ -285,6 +285,8 @@ class Fan(db.Model):
     controller = db.relationship('Controller', back_populates='fans', uselist=False)
     setpoints = db.relationship('FanSetpoint', back_populates='fan', cascade="all, delete-orphan")
     logs = db.relationship('FanLog', back_populates='fan', cascade="all, delete-orphan")
+    # updates every time the fan RPM is reported
+    last_report = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
 
@@ -304,6 +306,16 @@ class Fan(db.Model):
         if self.controller:
             return f"Fan: {self.port_num} | Controller: {self.controller.id}"
         return f"FanID: {self.id}"
+
+
+fan_rpm_report_trigger = db.DDL("""\
+CREATE TRIGGER update_fan_rpm_report_tr UPDATE OF rpm ON fan
+  BEGIN
+    UPDATE fan
+     SET last_report = DATETIME('now')
+    WHERE id = NEW.id;
+  END;""")
+db.event.listen(Fan.__table__, 'after_create', fan_rpm_report_trigger)
 
 
 class FanSetpoint(db.Model):
@@ -349,7 +361,7 @@ update_fan_log_trigger = db.DDL("""\
 CREATE TRIGGER update_fan_active_tr UPDATE OF pwm ON fan
   BEGIN
     INSERT INTO fan_log (fan_id, old_pwm, new_pwm, create_date) 
-    VALUES (NEW.id, OLD.pwm, NEW.pwm, DATETIME('now','localtime'));
+    VALUES (NEW.id, OLD.pwm, NEW.pwm, DATETIME('now'));
   END;""")
 db.event.listen(Fan.__table__, 'after_create', update_fan_log_trigger)
 

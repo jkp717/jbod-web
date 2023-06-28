@@ -105,6 +105,11 @@ def get_console() -> Union[JBODConsole, None]:
     return getattr(current_app, 'console')
 
 
+def get_fan_state():
+
+    return None
+
+
 def console_connection_check():
     """
     Used in jinja2 templates
@@ -529,6 +534,7 @@ def console_callback(tty: JBODConsole, rx: JBODRxData):
                     else:
                         fan.pwm = data['pwm'][i]
                         fan.rpm = int(rpm)
+                        fan.last_report = datetime.utcnow()
                         _logger.debug("Stored fan[%s] rpm: %s", fan.id, fan.rpm)
                 ctrlr.last_ds2 = datetime.utcnow()
                 ctrlr.alive = True
@@ -604,7 +610,7 @@ def fan_calibration(fan_id: Union[int, str]) -> None:
         MIN_FAN_PWM = int(utils.get_config_value('min_fan_pwm'))
         MAX_FAN_PWM = int(utils.get_config_value('max_fan_pwm'))
         DEFAULT_FAN_PWM = int(utils.get_config_value('default_fan_pwm'))
-        # get console
+        # get consoleF
         tty = get_console()
         if not tty:
             raise SerialException("Serial connection not established.")

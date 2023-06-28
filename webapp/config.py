@@ -28,7 +28,8 @@ config_defaults = {
     'job_max_failures': 3,
     # minutes until the failed job is resumed
     'job_paused_minutes': 60,
-    'http_requests_timeout': 15
+    'http_requests_timeout': 15,
+    'fan_alert_after_seconds': 120
 }
 
 scheduler_job_defaults = {
