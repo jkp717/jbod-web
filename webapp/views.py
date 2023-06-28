@@ -48,11 +48,12 @@ class IndexView(BaseView):
         """
         App index view
         """
+        inactive_jobs = db.session.query(SysJob).where(SysJob.active == False).all()
         setup_required = {
             'truenas': truenas_connection_info() is not None,
             'controller': console_connection_check(),
             'chassis': utils.get_model_by_id(Chassis, 1) is not None,
-            'jobs': len(db.session.query(SysJob).where(SysJob.active == False).all()) == 0,  # noqa
+            'jobs': len(inactive_jobs) == 0,  # noqa
         }
         tty = get_console()
         if not tty:
@@ -72,13 +73,20 @@ class IndexView(BaseView):
                 }
             }
         jbods = db.session.query(Chassis).where(Chassis.controller_id is not None).all()  # noqa
+        sys_scheduler = {
+            'running': scheduler.running,
+            'active_jobs': len(scheduler.get_jobs()),
+            'inactive_jobs': len(inactive_jobs),  # comes from db
+            'paused_jobs': len(db.session.query(SysJob).where(SysJob.paused == True).all())
+        }
         return self.render(
             'index.html',
             setup_complete=all(setup_required),
             setup_required=setup_required,
             jbods=jbods,
             disk_tooltip=['name', 'serial', 'temperature'],
-            tty_stats=tty_stats
+            tty_stats=tty_stats,
+            scheduler=sys_scheduler
         )
 
 
@@ -467,7 +475,7 @@ class ChassisView(JBODBaseView):
         'populated_slots': utils.disk_link_formatter,
     }
     column_extra_row_actions = [
-        LinkRowAction('mdl-fan', '/fan/?flt1_controller_chassis_id_equals={row_id}'),
+        LinkRowAction('row-action mdl-fan', '/fan/?flt1_controller_chassis_id_equals={row_id}'),
     ]
     column_labels = {
         'slot_cnt': 'Disk Slots',
@@ -754,6 +762,7 @@ class TaskView(JBODBaseView):
     column_editable_list = ['active', 'seconds', 'minutes', 'hours', 'paused']
     column_formatters = {'next_run': utils.next_job_runtime_formatter}
     column_extra_row_actions = [utils.RunJobRowAction()]
+    column_labels = {'consecutive_failures': 'Failures'}
 
     def is_editable_row(self, row, name):
         if not row.can_edit:
