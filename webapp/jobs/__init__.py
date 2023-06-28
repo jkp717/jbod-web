@@ -1,3 +1,4 @@
+import os
 import json
 import logging
 import time
@@ -403,15 +404,25 @@ def query_controller_properties(controller: Controller) -> Controller:
 
 def database_cleanup():
     with scheduler.app.app_context():
+        # clean up each table storing historical data
         filter_before = datetime.utcnow() - timedelta(days=2)
         old_temps = db.session.query(DiskTemp).filter(DiskTemp.create_date <= filter_before).all() or []
         old_logs = db.session.query(FanLog).filter(FanLog.create_date <= filter_before).all() or []
         old_stats = db.session.query(ComStat).filter(ComStat.stat_date <= filter_before).all() or []
         rows = old_temps + old_logs + old_stats
+        _logger.info(f"database_cleanup: {len(rows) if rows else 0} rows being removed from database.")
         if rows:
             for r in rows:
                 db.session.delete(r)
             db.session.commit()
+        # clean up upload files
+        upload_dir = current_app.config['UPLOAD_FOLDER']
+        if len(os.listdir(upload_dir)) == 0:
+            _logger.info(f"database_cleanup: Upload directory {upload_dir} is empty. Nothing cleaned.")
+        else:
+            for fn in os.listdir(upload_dir):
+                os.remove(os.path.join(upload_dir, fn))
+                _logger.info(f"database_cleanup: {os.path.join(upload_dir, fn)} removed.")
 
 
 def poll_controller_data() -> None:
