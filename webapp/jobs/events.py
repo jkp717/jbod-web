@@ -12,8 +12,8 @@ def fan_calibration_job_listener(event):
     """Single trigger event listener"""
     with jobs.scheduler.app.app_context():
         fan = db.session.query(Fan).where(Fan.calibration_job_uuid == getattr(event, 'job_id')).first()
-        original_rpm = fan.rpm
         if fan:
+            original_rpm = fan.rpm or 0
             if event.exception:
                 fan.calibration_status = utils.StatusFlag.FAIL
             else:
@@ -23,6 +23,8 @@ def fan_calibration_job_listener(event):
             db.session.commit()
             # remove itself after triggering on fan job
             jobs.scheduler.remove_listener(fan_calibration_job_listener)
+        else:
+            _logger.error(f"fan_calibration_job_listener [{event.job_id}] did not return a fan.")
 
 
 def job_missed_listener(event):
