@@ -433,7 +433,9 @@ def poll_controller_data() -> None:
     """
     with scheduler.app.app_context():
         tty = get_console()
-        if not tty.serial.is_open:
+        if not tty:
+            raise SerialException("Serial connection not established.")
+        elif not tty.serial.is_open:
             raise SerialException("Serial connection not established.")
         # controller responds to DC2 requests with json-like object
         tty.transmit(tty.ctrlc.DC2)
@@ -630,24 +632,24 @@ def fan_calibration(fan_id: Union[int, str]) -> None:
         if psu_status.data != 'ON':
             raise Exception(f"Controller {fan_model.controller_id} psu status is {psu_status.data}; "
                             f"skipping fan_calibration.")
-        # pwm fan‘s speed scales broadly linear with the duty-cycle of the PWM signal between
+        # pwm fan's speed scales broadly linear with the duty-cycle of the PWM signal between
         # maximum speed at 100% PWM and the specified minimum speed at 20% PWM
         if not fan_model.rpm:
-            r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.id)
+            r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.port_num)
             original_rpm = int(r.data)
         else:
             original_rpm = fan_model.rpm
         original_pwm = fan_model.pwm if MIN_FAN_PWM < fan_model.pwm < MAX_FAN_PWM else DEFAULT_FAN_PWM
         _logger.debug(f"fan_calibration: initial values; rpm={original_rpm}; pwm={original_pwm}")
-        tty.command_write(JBODCommand.PWM, fan_model.controller_id, fan_model.id, MIN_FAN_PWM)
+        tty.command_write(JBODCommand.PWM, fan_model.controller_id, fan_model.port_num, MIN_FAN_PWM)
         # wait for rpm value to normalize
-        r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.id)
+        r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.port_num)
         new_rpm = int(r.data)
         prev_rpm = 0
         while abs(new_rpm - prev_rpm) > 100 and wait_secs <= max_wait_secs:
             time.sleep(1)
             prev_rpm = new_rpm
-            r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.id)
+            r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.port_num)
             _logger.debug(f"fan_calibration: min_pwm loop: rpm value: {int(r.data)}")
             new_rpm = int(r.data)
             wait_secs += 1
@@ -656,16 +658,16 @@ def fan_calibration(fan_id: Union[int, str]) -> None:
         # store new readings in min_rpm; round to the nearest 100th
         fan_model.min_rpm = round(new_rpm, -2)
         # Set fan to max PWM
-        tty.command_write(JBODCommand.PWM, fan_model.controller_id, fan_model.id, MAX_FAN_PWM)
+        tty.command_write(JBODCommand.PWM, fan_model.controller_id, fan_model.port_num, MAX_FAN_PWM)
         # wait for rpm value to normalize
         time.sleep(0.5)
-        r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.id)
+        r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.port_num)
         new_rpm = int(r.data)
         wait_secs = 0
         while abs(new_rpm - prev_rpm) > 100 and wait_secs <= max_wait_secs:
             time.sleep(1)
             prev_rpm = new_rpm
-            r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.id)
+            r = tty.command_write(JBODCommand.RPM, fan_model.controller_id, fan_model.port_num)
             new_rpm = int(r.data)
             wait_secs += 1
         _logger.debug(f"fan_calibration: max rpm normalization took {wait_secs} secs.  "
@@ -678,7 +680,7 @@ def fan_calibration(fan_id: Union[int, str]) -> None:
             fan_model.four_pin = True
         # Set fan back to original PWM
         _logger.debug("fan_calibration: Complete! Setting fan back to initial values.")
-        tty.command_write(JBODCommand.PWM, fan_model.controller_id, fan_model.id, original_pwm)
+        tty.command_write(JBODCommand.PWM, fan_model.controller_id, fan_model.port_num, original_pwm)
         fan_model.rpm = original_rpm
         # commit changes to db
         db.session.commit()
