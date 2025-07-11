@@ -369,7 +369,7 @@ class AlertLogHandler(logging.Handler):
 
     def emit(self, record):
         # Clear the log message so that it can be put to db via sql (escape quotes)
-        self.log_msg = record.msg.strip().replace('\'', '\'\'')
+        self.log_msg = str(record.msg).strip().replace('\'', '\'\'')
         # Make the SQL insert
         with self.app_context.app_context():
             self.db_session.add(self.alert_model(category=record.levelname, content=self.log_msg))
