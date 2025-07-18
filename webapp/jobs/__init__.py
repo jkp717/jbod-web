@@ -158,8 +158,10 @@ def query_disk_properties() -> None:
             return
         try:
             zfs_props = _query_zfs_properties()
+            tn_serials = []  # truenas disk list by serial
             db_serials = [disk.serial for disk in db.session.query(Disk).all()]
             for disk in resp.json():
+                tn_serials.append(disk.get('serial'))
                 disk_zfs = zfs_props.get(disk.get('name'), {})
                 if disk.get('serial') in db_serials:
                     model = db.session.query(Disk).filter(Disk.serial == disk.get('serial')).first()
@@ -193,6 +195,10 @@ def query_disk_properties() -> None:
             db.session.commit()
         except IntegrityError:
             db.session.rollback()
+
+        orphan_disks = list(sorted(set(db_serials) - set(tn_serials)))
+        if orphan_disks:
+            _logger.warning(f"Disk in database but not in TrueNAS: {orphan_disks}")
 
 
 def query_disk_temperatures() -> None:
