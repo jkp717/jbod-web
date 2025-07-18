@@ -460,7 +460,6 @@ class DiskView(JBODBaseView):
             current_app.logger.error(f'DiskView.refresh: {err}')
             flash('Failed to refresh disk properties.', 'error')
             if current_app.config['DEBUG']:
-                current_app.logger.error(f'DiskView.refresh: {err}')
                 raise err
         return redirect(self.get_url('.index_view'))
 
