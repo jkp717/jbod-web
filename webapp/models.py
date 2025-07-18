@@ -97,7 +97,7 @@ class Disk(db.Model):
     phy_slot_id = db.Column(db.Integer, db.ForeignKey("phy_slot.id"), unique=True)
     create_date = db.Column(db.DateTime, default=datetime.datetime.now(datetime.timezone.utc))
     modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.now(datetime.timezone.utc))
-    disk_temps = db.relationship('DiskTemp', back_populates='disk', lazy="selectin")
+    disk_temps = db.relationship('DiskTemp', back_populates='disk', lazy="selectin", cascade="all, delete-orphan")
     phy_slot = db.relationship('PhySlot', back_populates='disk', uselist=False)
 
     @hybrid_property
