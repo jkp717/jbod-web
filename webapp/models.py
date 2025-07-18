@@ -24,8 +24,8 @@ class SysConfig(db.Model):
     key = db.Column(db.String, unique=True)
     value = db.Column(db.String)
     encrypt = db.Column(db.Boolean, default=False)
-    create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
+    create_date = db.Column(db.DateTime, default=datetime.datetime.now(datetime.timezone.utc))
+    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.now(datetime.timezone.utc))
 
     @hybrid_property
     def last_update(self):
@@ -50,8 +50,8 @@ class SysJob(db.Model):
     consecutive_failures = db.Column(db.Integer, default=0)
     active = db.Column(db.Boolean, default=False)
     paused = db.Column(db.Boolean, default=False)
-    create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
+    create_date = db.Column(db.DateTime, default=datetime.datetime.now(datetime.timezone.utc))
+    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.now(datetime.timezone.utc))
 
     @hybrid_property
     def last_update(self):
@@ -95,8 +95,8 @@ class Disk(db.Model):
     temperature = db.Column(db.Integer)  # last temperature reading
     last_temp_reading = db.Column(db.DateTime)
     phy_slot_id = db.Column(db.Integer, db.ForeignKey("phy_slot.id"), unique=True)
-    create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
+    create_date = db.Column(db.DateTime, default=datetime.datetime.now(datetime.timezone.utc))
+    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.now(datetime.timezone.utc))
     disk_temps = db.relationship('DiskTemp', back_populates='disk', lazy="selectin")
     phy_slot = db.relationship('PhySlot', back_populates='disk', uselist=False)
 
@@ -128,7 +128,7 @@ class DiskTemp(db.Model):
     temp = db.Column(db.Integer, nullable=False)
     disk_serial = db.Column(db.String, db.ForeignKey("disk.serial"))
     disk = db.relationship('Disk', back_populates='disk_temps')
-    create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    create_date = db.Column(db.DateTime, default=datetime.datetime.now(datetime.timezone.utc))
 
     def __repr__(self):
         return f"{self.temp}"
@@ -142,8 +142,8 @@ class Chassis(db.Model):
     controller_id = db.Column(db.Integer, db.ForeignKey("controller.id"), unique=True)
     phy_slots = db.relationship('PhySlot', back_populates='chassis', cascade="all, delete-orphan")
     controller = db.relationship('Controller', back_populates='chassis', uselist=False)
-    create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
+    create_date = db.Column(db.DateTime, default=datetime.datetime.now(datetime.timezone.utc))
+    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.now(datetime.timezone.utc))
 
     @hybrid_property
     def psu_on(self):
@@ -224,8 +224,8 @@ class PhySlot(db.Model):
     chassis_id = db.Column(db.Integer, db.ForeignKey("chassis.id"))
     chassis = db.relationship('Chassis', back_populates='phy_slots')
     disk = db.relationship('Disk', back_populates='phy_slot', uselist=False)
-    create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
+    create_date = db.Column(db.DateTime, default=datetime.datetime.now(datetime.timezone.utc))
+    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.now(datetime.timezone.utc))
 
     @hybrid_property
     def last_update(self):
@@ -248,8 +248,8 @@ class Controller(db.Model):
     fans = db.relationship('Fan', back_populates='controller', cascade="all, delete-orphan")
     chassis = db.relationship('Chassis', back_populates='controller', uselist=False)
     last_ds2 = db.Column(db.DateTime)  # last time the controller responded to a ds2 request
-    create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
+    create_date = db.Column(db.DateTime, default=datetime.datetime.now(datetime.timezone.utc))
+    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.now(datetime.timezone.utc))
     __table_args__ = (
         db.PrimaryKeyConstraint(id, mcu_device_id),
     )
@@ -286,9 +286,9 @@ class Fan(db.Model):
     setpoints = db.relationship('FanSetpoint', back_populates='fan', cascade="all, delete-orphan")
     logs = db.relationship('FanLog', back_populates='fan', cascade="all, delete-orphan")
     # updates every time the fan RPM is reported
-    last_report = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
+    last_report = db.Column(db.DateTime, default=datetime.datetime.now(datetime.timezone.utc))
+    create_date = db.Column(db.DateTime, default=datetime.datetime.now(datetime.timezone.utc))
+    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.now(datetime.timezone.utc))
 
     @hybrid_property
     def controller_uuid(self):
@@ -325,8 +325,8 @@ class FanSetpoint(db.Model):
     pwm = db.Column(db.Integer)
     temp = db.Column(db.Integer)
     fan = db.relationship('Fan', back_populates='setpoints')
-    create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
+    create_date = db.Column(db.DateTime, default=datetime.datetime.now(datetime.timezone.utc))
+    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.now(datetime.timezone.utc))
     __table_args__ = (
         db.UniqueConstraint('fan_id', 'pwm', name='fan_setpoint_pwm_uc'),
         db.UniqueConstraint('fan_id', 'temp', name='fan_setpoint_temp_uc')
@@ -349,8 +349,8 @@ class FanLog(db.Model):
     old_pwm = db.Column(db.Integer)
     new_pwm = db.Column(db.Integer)
     fan = db.relationship('Fan', back_populates='logs')
-    create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
+    create_date = db.Column(db.DateTime, default=datetime.datetime.now(datetime.timezone.utc))
+    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.now(datetime.timezone.utc))
 
     def __repr__(self):
         if self.fan:
@@ -371,8 +371,8 @@ class Alert(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     category = db.Column(db.String)  # same as python logger
     content = db.Column(db.String)
-    create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
+    create_date = db.Column(db.DateTime, default=datetime.datetime.now(datetime.timezone.utc))
+    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.now(datetime.timezone.utc))
 
     @hybrid_property
     def last_update(self):
@@ -395,5 +395,5 @@ class ComStat(db.Model):
     rx = db.Column(db.Integer, default=0)
     tx = db.Column(db.Integer, default=0)
     err = db.Column(db.Integer, default=0)
-    create_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
+    create_date = db.Column(db.DateTime, default=datetime.datetime.now(datetime.timezone.utc))
+    modify_date = db.Column(db.DateTime, onupdate=datetime.datetime.now(datetime.timezone.utc))
