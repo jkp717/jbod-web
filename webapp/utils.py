@@ -17,6 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from webapp.models import db, FanSetpoint, SysConfig, Disk, Alert, Chassis, PhySlot, Fan
 from webapp import jobs
 
+_logger = logging.getLogger("utils")
 
 class StatusFlag(IntEnum):
     FAIL = 0
