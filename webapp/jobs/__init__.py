@@ -2,7 +2,7 @@ import os
 import json
 import logging
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Optional, Union
 
 from apscheduler.job import Job
@@ -197,31 +197,37 @@ def query_disk_properties() -> None:
 
 def query_disk_temperatures() -> None:
     with scheduler.app.app_context():
+        _logger.debug("query_disk_temperatures scheduled job starting.")
         disks = db.session.query(Disk).all()
         if not disks:
             _logger.warning("query_disk_temperatures scheduled job skipped. No disks to query.")
             return
         try:
+            req_payload= {"names": [disk.name for disk in disks], "options": {"powermode": "NEVER"}}
             resp = utils.truenas_api_request(
                 'POST',
                 '/api/v2.0/disk/temperatures',
                 headers={'Content-Type': 'application/json'},
-                data={"names": [disk.name for disk in disks], "powermode": "NEVER"}
+                data=req_payload
             )
             if resp.status_code == 200:
                 _logger.debug(f"query_disk_temperatures received a valid response from host; {resp}")
                 for _name, temp in resp.json().items():
+                    found_disk = False
                     for disk in disks:
                         if disk.name == _name:
+                            found_disk = True
                             disk.temperature = temp
-                            disk.last_temp_reading = datetime.utcnow()
+                            disk.last_temp_reading = datetime.now(timezone.utc)
                             break
                 db.session.commit()
             else:
-                Exception(f"query_disk_temperatures api response code != 200: {resp.status_code}")
+                _logger.error(f"query_disk_temperatures api response code != 200: {resp.status_code} response: {resp.json()}")
+                raise Exception(f"query_disk_temperatures api response code != 200: {resp.status_code} response: {resp.json()}")
         except ConnectionError as err:
             _logger.warning("query_disk_temperatures: unable to connect to Truenas. Is host running?")
             raise err
+
 
 
 def _query_zfs_properties() -> dict:
