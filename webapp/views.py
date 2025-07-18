@@ -568,6 +568,7 @@ class PhySlotView(JBODBaseView):
     can_delete = False
     can_export = True
     column_list = ['phy_slot', 'chassis', 'disk', 'last_update']
+    column_filters = ['phy_slot', ('chassis', 'chassis.id')]
     column_sortable_list = ['phy_slot', ('chassis', 'chassis.id')]
 
     def get_empty_list_message(self):
