@@ -39,6 +39,13 @@ def get_alerts():
 def truenas_api_request(method: str, url_path: str, headers: Optional[dict] = None, data: Optional[dict] = None):
     if headers is None:
         headers = {}
+    _logger.debug(f"""
+        truenas_api_request called:
+        \tmethod: {method}, 
+        \turl_path: {url_path}, 
+        \theaders: {headers}, 
+        \tdata: {data}"""
+    )
     with current_app.app_context():
         api_key = db.session.execute(
             db.select(SysConfig).where(SysConfig.key == "truenas_api_key")

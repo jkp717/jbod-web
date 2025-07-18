@@ -421,7 +421,10 @@ class DiskView(JBODBaseView):
     list_template = 'refresh_list.html'
     form_columns = ['phy_slot']
     column_editable_list = ['phy_slot']
-    column_filters = ['serial', 'bus', 'type', 'size', 'phy_slot.chassis.name', 'zfs_pool', 'name']
+    column_filters = [
+        'serial', 'bus', 'type', 'size', 'phy_slot.chassis.name', 'zfs_pool', 'name',
+        'read_errors', 'write_errors'
+    ]
     column_list = [
         'name', 'serial', 'zfs_pool', 'model', 'size', 'type', 'bus', 'phy_slot', 'temperature',
         'last_temp_reading', 'last_update'
